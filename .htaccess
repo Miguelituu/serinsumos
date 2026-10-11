@@ -1,0 +1,12 @@
+Options -Indexes
+DirectoryIndex index.php
+RewriteEngine On
+
+# URLs de producto y resultados de checkout.
+RewriteRule ^producto/([^/]+)/?$ producto.php?handle=$1 [B,L,QSA,NC]
+RewriteRule ^checkout/(success|cancelled)/?$ checkout-result.php?result=$1 [L,QSA,NC]
+
+# Bloquear archivos de configuración y documentación si se solicita por URL.
+<FilesMatch "^(config\.php|lib\.php|database\.sql|README\.md)$">
+    Require all denied
+</FilesMatch>
