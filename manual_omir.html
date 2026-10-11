@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Manual de Administración y Entrega de Plataforma · Serinsumos</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 10mm 12mm 10mm 12mm;
+        }
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .page-break {
+                page-break-after: always;
+                break-after: page;
+            }
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #1e293b;
+            background: #ffffff;
+            font-size: 11.8px;
+            line-height: 1.45;
+        }
+
+        /* Portada / Header */
+        .cover {
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 16px 22px;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+        .cover-tag {
+            display: inline-block;
+            background: #ffb703;
+            color: #0f172a;
+            font-weight: 800;
+            font-size: 9.5px;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding: 3px 9px;
+            border-radius: 14px;
+            margin-bottom: 6px;
+        }
+        .cover h1 {
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 2px;
+            line-height: 1.2;
+            color: #ffffff;
+        }
+        .cover p.subtitle {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 10px;
+        }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 6px;
+            padding: 8px 12px;
+        }
+        .meta-item span {
+            display: block;
+            font-size: 9.5px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 1px;
+        }
+        .meta-item strong {
+            font-size: 11.5px;
+            color: #ffffff;
+        }
+
+        /* Secciones */
+        .section {
+            margin-bottom: 10px;
+        }
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 800;
+            color: #0f172a;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+        }
+        .section-title .icon {
+            font-size: 15px;
+        }
+
+        /* Tarjetas */
+        .card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            break-inside: avoid;
+        }
+        .card-highlight {
+            background: #fffbeb;
+            border-color: #fde68a;
+        }
+        .card-blue {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+        }
+
+        /* Lista de pasos */
+        .step-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin: 6px 0;
+        }
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 7px 10px;
+            break-inside: avoid;
+        }
+        .step-num {
+            background: #ffb703;
+            color: #0f172a;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 10.5px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .step-content strong {
+            display: block;
+            font-size: 11.8px;
+            color: #0f172a;
+            margin-bottom: 1px;
+        }
+        .step-content p {
+            font-size: 11.2px;
+            color: #475569;
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        /* Tablas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 6px 0;
+            font-size: 11.2px;
+            break-inside: avoid;
+        }
+        th, td {
+            padding: 7px 9px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 700;
+            font-size: 10.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        tr:nth-child(even) td {
+            background: #f8fafc;
+        }
+
+        .page-footer {
+            margin-top: 8px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 6px;
+            font-size: 10px;
+            color: #94a3b8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         PÁGINA 1: PRESENTACIÓN, ACCESO Y CLIENTES MAYORISTAS
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div class="cover">
+        <span class="cover-tag">Entrega y Documentación Oficial</span>
+        <h1>Manual de Administración de la Tienda Online</h1>
+        <p class="subtitle">Plataforma Web Mayorista de Serinsumos</p>
+
+        <div class="meta-grid">
+            <div class="meta-item">
+                <span>Destinatario</span>
+                <strong>Omir (Dueño de Serinsumos)</strong>
+            </div>
+            <div class="meta-item">
+                <span>Período de Trabajo</span>
+                <strong>~2 Meses de Desarrollo Integral</strong>
+            </div>
+            <div class="meta-item">
+                <span>Ubicación y Negocio</span>
+                <strong>Córdoba (San Vicente), Argentina</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-blue" style="margin-bottom:8px;">
+        <h3 style="color:#1e3a8a; margin-bottom: 3px; font-size:12.5px;">Estimado Omir:</h3>
+        <p style="color:#1e293b; margin-bottom: 4px;">
+            Concluido el período de <strong>aproximadamente dos meses de trabajo integral</strong>, te hacemos entrega formal de la nueva plataforma web de <strong>Serinsumos</strong>.
+        </p>
+        <p style="color:#1e293b;">
+            Durante este tiempo rediseñamos y construimos una solución completa y a medida: la tienda ahora se adapta a cualquier celular o computadora, cuenta con un catálogo ágil de más de 150 productos, protege los precios mayoristas para clientes verificados, permite recibir pagos por transferencia con comprobante y conecta todo directamente con tu WhatsApp comercial. Este manual te explica cómo manejarla de forma práctica y sin tecnicismos.
+        </p>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title"><span class="icon">🔑</span> 1. Cómo ingresar al Panel de Control</h2>
+        <div class="step-list">
+            <div class="step-item">
+                <div class="step-num">1</div>
+                <div class="step-content">
+                    <strong>Dirección de administración</strong>
+                    <p>En el navegador de tu computadora o celular, ingresá a: <strong>tudominio.com/admin.php</strong> (o tocá "Mi Cuenta" e iniciá sesión).</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">2</div>
+                <div class="step-content">
+                    <strong>Tu usuario y contraseña</strong>
+                    <p>Ingresá con tu correo de administrador y tu clave. El sistema te habilitará de inmediato todas las funciones de gestión.</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">3</div>
+                <div class="step-content">
+                    <strong>Secciones simples</strong>
+                    <p>En la parte superior verás las 6 pestañas del panel: <em>Clientes</em>, <em>Pedidos</em>, <em>Productos</em>, <em>Banners</em>, <em>Comprobantes</em> y <em>Configuración</em>.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title"><span class="icon">👥</span> 2. Manejo de Clientes Mayoristas</h2>
+        <div class="card" style="margin-bottom:6px;">
+            <p style="color:#334155;">
+                <strong>Privacidad de precios:</strong> Los visitantes pueden ver las fotos de los productos, pero <strong>nadie ve los precios mayoristas ni puede comprar hasta que vos lo apruebes</strong>. Los compradores completan un registro con nombre de su negocio, teléfono y localidad.
+            </p>
+        </div>
+        <div class="step-list">
+            <div class="step-item">
+                <div class="step-num">✓</div>
+                <div class="step-content">
+                    <strong>Aprobar cliente nuevo (1 clic):</strong>
+                    <p>En la pestaña <em>Clientes</em>, los nuevos aparecen destacados en amarillo. Tocás <strong>"Aprobar cliente"</strong> y a partir de ese segundo ya pueden ver tus precios y armar pedidos.</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">✕</div>
+                <div class="step-content">
+                    <strong>Pausar o revocar acceso:</strong>
+                    <p>Si necesitás quitarle el acceso a alguien, presionás <strong>"Revocar acceso"</strong> y el sistema vuelve a bloquearle la vista de precios al instante.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <span>Serinsumos · Insumos para sublimación (Córdoba, Argentina)</span>
+        <span>Página 1 de 4</span>
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         PÁGINA 2: PRODUCTOS, CATÁLOGO, PEDIDOS Y COBRANZA
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div class="section">
+        <h2 class="section-title"><span class="icon">📦</span> 3. Manejo de Productos y Precios</h2>
+        <p style="margin-bottom:6px;">Dejamos precargado tu catálogo con <strong>154 artículos</strong> listos para la venta (remeras, tazas, almohadones, tintas, vinilos, insumos de estampado, etc.).</p>
+
+        <div class="card card-highlight">
+            <strong style="color:#92400e;">💡 Compras ágiles y sin interrupciones para el cliente:</strong>
+            <p style="color:#78350f; font-size:11.5px; margin-top:2px;">
+                Cuando un cliente toca "Agregar al carrito" en cualquier producto, ya <strong>no se lo redirige fuera de la página</strong>. El producto se agrega con una notificación suave en pantalla y el cliente puede seguir mirando y sumando más insumos con total fluidez.
+            </p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:25%;">Acción</th>
+                    <th style="width:45%;">¿Cómo se hace en el panel?</th>
+                    <th style="width:30%;">Resultado</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Cambiar un precio</strong></td>
+                    <td>En la pestaña <em>Productos</em>, buscás el artículo y en la casilla "Precio local ($)" escribís el nuevo importe en pesos. Presionás "Guardar cambios".</td>
+                    <td>Se actualiza inmediatamente en toda la web.</td>
+                </tr>
+                <tr>
+                    <td><strong>Pausar / Ocultar producto</strong></td>
+                    <td>Desmarcás la casilla "Visible en tienda" y guardás.</td>
+                    <td>El producto desaparece del catálogo público hasta que vuelvas a tener stock.</td>
+                </tr>
+                <tr>
+                    <td><strong>Vista rápida</strong></td>
+                    <td>En celulares y PC, los clientes tienen un botón de "ojo" para ver fotos y medidas al instante sin salir del catálogo.</td>
+                    <td>Facilita pedidos rápidos por cantidad.</td>
+                </tr>
+                <tr>
+                    <td><strong>Productos similares</strong></td>
+                    <td>En la parte inferior de cada producto, el sistema le sugiere automáticamente otros artículos de la misma categoría.</td>
+                    <td>Fomenta que el cliente compre insumos complementarios.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section" style="margin-top:10px;">
+        <h2 class="section-title"><span class="icon">🛒</span> 4. Manejo de Pedidos y Cobranza</h2>
+        <p style="margin-bottom:6px;">El circuito comercial fue diseñado para que tengas control total de cada venta y recibas los pagos de forma segura:</p>
+
+        <div class="step-list">
+            <div class="step-item">
+                <div class="step-num">1</div>
+                <div class="step-content">
+                    <strong>El cliente arma el pedido en la web</strong>
+                    <p>Elige los insumos, revisa las cantidades y confirma el pedido. El sistema le asigna un número de orden único (ej: Pedido #1024).</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">2</div>
+                <div class="step-content">
+                    <strong>Revisión en el Panel</strong>
+                    <p>En la pestaña <em>Pedidos</em> ves el detalle de los productos solicitados, las cantidades y el total en pesos a cobrar.</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">3</div>
+                <div class="step-content">
+                    <strong>Pago por transferencia y comprobante</strong>
+                    <p>El cliente realiza la transferencia bancaria y sube la foto o archivo del comprobante directamente en la web. En la pestaña <em>Comprobantes</em> podés ver la imagen en grande para validar que el dinero haya ingresado a tu cuenta bancaria.</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">4</div>
+                <div class="step-content">
+                    <strong>Coordinación por WhatsApp en 1 toque</strong>
+                    <p>El sistema genera un botón verde con el mensaje ya redactado para enviarle al cliente por WhatsApp: número de pedido, productos y confirmación de despacho o retiro en el taller.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <span>Serinsumos · Insumos para sublimación (Córdoba, Argentina)</span>
+        <span>Página 2 de 4</span>
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         PÁGINA 3: MODO MANTENIMIENTO Y CONTACTO DE EMERGENCIA
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div class="section">
+        <h2 class="section-title"><span class="icon">🛠️</span> 5. Modo Mantenimiento con Contacto de Emergencia</h2>
+        <p style="margin-bottom:8px;">Esta es una función estratégica incorporada para darte tranquilidad y control sobre la visibilidad de tu negocio:</p>
+
+        <div class="card card-highlight">
+            <strong style="color:#92400e;">¿Para qué sirve?</strong>
+            <p style="color:#78350f; font-size:11.5px; margin-top:2px;">
+                Si en algún momento necesitás realizar balance, cargar listas nuevas de precios de forma masiva, tomarte vacaciones o cerrar temporalmente la tienda, <strong>no hace falta apagar la web ni perder clientes</strong>.
+            </p>
+        </div>
+
+        <div class="step-list">
+            <div class="step-item">
+                <div class="step-num">1</div>
+                <div class="step-content">
+                    <strong>Cómo activarlo con 1 solo botón</strong>
+                    <p>Entrás a <em>Configuración</em> en tu panel de administración. Arriba de todo verás un recuadro destacado de <strong>Modo Mantenimiento</strong> con un botón rojo. Al presionarlo, el sitio queda pausado inmediatamente para el público.</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">2</div>
+                <div class="step-content">
+                    <strong>Cómo desactivarlo y reabrir la web</strong>
+                    <p>Cuando termines tus tareas, en ese mismo recuadro presionás el botón verde <strong>"Desactivar modo mantenimiento y abrir el sitio"</strong> y la tienda vuelve a estar online y visible para todos los clientes.</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">3</div>
+                <div class="step-content">
+                    <strong>Qué ven tus clientes mientras está activo</strong>
+                    <p>Cualquier persona que ingrese verá una pantalla limpia y elegante con tu <strong>logo oficial</strong>, un aviso amistoso y un botón destacado de <strong>"Contacto de Emergencia"</strong>.</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">4</div>
+                <div class="step-content">
+                    <strong>El modal de contacto de emergencia</strong>
+                    <p>Al tocar ese botón, se abre una ventana con: botón para hablarte directo al <strong>WhatsApp de urgencias</strong>, la <strong>dirección física del taller en San Vicente</strong> (con botón para abrir en Google Maps) y tu cuenta de <strong>Instagram</strong> (@ser.insumos).</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">5</div>
+                <div class="step-content">
+                    <strong>Vos podés seguir viendo la web completa normalmente</strong>
+                    <p>Como vos tenés rol de administrador, el sistema te deja navegar toda la tienda, ver productos y probar pedidos sin ningún bloqueo, mostrándote una barra roja superior recordándote que el público general está en pausa.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-blue" style="margin-top:10px;">
+            <strong style="color:#1e3a8a;">Acceso para el administrador siempre asegurado:</strong>
+            <p style="color:#1e293b; font-size:11.5px; margin-top:2px;">
+                Incluso si tu sesión se llegara a cerrar mientras el modo mantenimiento está activo, al pie de la pantalla de mantenimiento tenés un enlace discreto que dice <em>"¿Sos administrador? Iniciar sesión"</em>, permitiéndote ingresar con tu correo y clave sin quedar bloqueado en ningún momento.
+            </p>
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <span>Serinsumos · Insumos para sublimación (Córdoba, Argentina)</span>
+        <span>Página 3 de 4</span>
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         PÁGINA 4: CONFIGURACIÓN, CONTACTO, CONSEJOS Y CIERRE
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div class="section">
+        <h2 class="section-title"><span class="icon">⚙️</span> 6. Configuración General y Marca</h2>
+        <p style="margin-bottom:6px;">En la pestaña <strong>Configuración</strong> podés personalizar tu identidad y canales de venta cuando vos quieras:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:25%;">Elemento</th>
+                    <th style="width:40%;">¿Cómo modificarlo?</th>
+                    <th style="width:35%;">Impacto en la web</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Logo Principal</strong></td>
+                    <td>Tocás "Elegir archivo" y subís la imagen de tu logo desde tu celular o compu.</td>
+                    <td>Se reemplaza automáticamente en la cabecera, menú móvil, pie de página y pantalla de mantenimiento.</td>
+                </tr>
+                <tr>
+                    <td><strong>Favicon (Ícono de pestaña)</strong></td>
+                    <td>Subís el ícono pequeño de Serinsumos.</td>
+                    <td>Aparece en la pestaña del navegador de los clientes y en sus marcadores.</td>
+                </tr>
+                <tr>
+                    <td><strong>WhatsApp del Negocio</strong></td>
+                    <td>Colocás tu número con código de país (ej: <code>5493518198163</code>).</td>
+                    <td>Todos los botones flotantes de la web, la página de contacto y los pedidos enviarán los mensajes a ese número.</td>
+                </tr>
+                <tr>
+                    <td><strong>Banners de Portada</strong></td>
+                    <td>En la pestaña <em>Banners</em> podés subir fotos de promociones de temporada o cambiar el orden en que se muestran.</td>
+                    <td>Aparecen en el carrusel principal de la portada.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title"><span class="icon">📍</span> 7. Datos de Contacto y Ubicación Oficial</h2>
+        <p style="margin-bottom:6px;">La sección de contacto ahora es una <strong>página independiente y completa</strong> (accesible desde el menú superior, menú móvil y pie de página):</p>
+
+        <div class="card card-blue">
+            <ul style="list-style:none; padding:0; display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11.5px;">
+                <li><strong>📍 Taller y Depósito:</strong> Ramón Ocampo 1309, San Vicente, Córdoba (CP 5006)</li>
+                <li><strong>🗺️ Mapa Interactivo:</strong> Integrado directamente con Google Maps</li>
+                <li><strong>💬 WhatsApp Directo:</strong> Formulario que arma el mensaje listo para enviar</li>
+                <li><strong>📸 Instagram Oficial:</strong> Enlazado a @ser.insumos</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title"><span class="icon">⭐</span> 8. Consejos Prácticos para el Día a Día</h2>
+        <div class="step-list">
+            <div class="step-item">
+                <div class="step-num">1</div>
+                <div class="step-content">
+                    <strong>Aprobá clientes con rapidez</strong>
+                    <p>Cuando un taller de sublimación se registre, vas a ver un número en la pestaña <em>Clientes</em>. Aprobálos rápido para que no demoren en hacer su primer pedido.</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">2</div>
+                <div class="step-content">
+                    <strong>Verificá comprobantes bancarios</strong>
+                    <p>Antes de entregar la mercadería, abrí la foto del comprobante en la pestaña <em>Comprobantes</em> y cotejá el número de operación con tu home banking.</p>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">3</div>
+                <div class="step-content">
+                    <strong>Fotos claras para tus productos</strong>
+                    <p>Si agregás fotos nuevas de insumos, usá fotos claras con fondo blanco o neutro para que carguen rápido en los celulares de los clientes.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="background:#f1f5f9; text-align:center; padding:12px; margin-top:8px;">
+        <h3 style="color:#0f172a; margin-bottom:3px; font-size:13px;">¡Felicitaciones Omir por el lanzamiento de tu nueva web!</h3>
+        <p style="color:#475569; max-width:540px; margin:0 auto; font-size:11.2px;">
+            La plataforma de <strong>Serinsumos</strong> queda totalmente operativa, rápida, moderna y lista para acompañar el crecimiento de tus ventas mayoristas.
+        </p>
+    </div>
+
+    <div class="page-footer">
+        <span>Serinsumos · Insumos para sublimación (Córdoba, Argentina)</span>
+        <span>Página 4 de 4</span>
+    </div>
+
+</body>
+</html>
