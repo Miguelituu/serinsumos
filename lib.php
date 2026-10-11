@@ -219,6 +219,9 @@ function render_flashes(): void {
 function site_logo(): string {
     $custom = trim(setting('site_logo', ''));
     if ($custom !== '') {
+        if (preg_match('~/(uploads/branding/[^"\'\s]+)$~i', $custom, $m)) {
+            return site_url($m[1]);
+        }
         return $custom;
     }
     return 'https://horizons-cdn.hostinger.com/b099170c-e218-4fd7-9bf8-fe7a8698762b/57722fa4f7c62dff5fa9bb24d5ec7180.jpg';
@@ -227,6 +230,9 @@ function site_logo(): string {
 function site_favicon(): string {
     $custom = trim(setting('site_favicon', ''));
     if ($custom !== '') {
+        if (preg_match('~/(uploads/branding/[^"\'\s]+)$~i', $custom, $m)) {
+            return site_url($m[1]);
+        }
         return $custom;
     }
     return site_url('favicon.ico');
@@ -662,6 +668,9 @@ document.addEventListener('keydown', function(e) {
 }
 
 function check_maintenance_mode(): void {
+    if (php_sapi_name() === 'cli') {
+        return;
+    }
     if (!is_maintenance_mode()) {
         return;
     }

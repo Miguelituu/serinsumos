@@ -8,13 +8,12 @@ storage/
 .DS_Store
 Thumbs.db
 
-# Subidas generadas dinámicamente (conservar la estructura, no las pruebas locales)
+# Subidas dinámicas privadas
 uploads/receipts/*
 !uploads/receipts/.gitkeep
-uploads/branding/*
-!uploads/branding/.gitkeep
 
-# Archivos de respaldo o scripts de migración temporal
+# Archivos de respaldo o empaquetados
+*.zip
 *.bak
 *.sql.gz
 scratch/
