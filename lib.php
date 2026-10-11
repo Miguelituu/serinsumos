@@ -232,6 +232,464 @@ function site_favicon(): string {
     return site_url('favicon.ico');
 }
 
+function is_maintenance_mode(): bool {
+    return setting('maintenance_mode', '0') === '1';
+}
+
+function render_maintenance_page(): void {
+    $logo = site_logo();
+    $favicon = site_favicon();
+    $waUrl = whatsapp_url('Hola Serinsumos, me comunico de urgencia durante el mantenimiento del sitio web.');
+    ?>
+<!doctype html>
+<html lang="es-AR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Sitio en Mantenimiento · Serinsumos</title>
+    <link rel="icon" href="<?= e($favicon) ?>">
+    <link rel="shortcut icon" href="<?= e($favicon) ?>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #09111e;
+            --card-bg: rgba(23, 37, 48, 0.85);
+            --card-border: rgba(255, 255, 255, 0.12);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --yellow: #ffb703;
+            --yellow-hover: #e0a100;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #09111e 0%, #172530 50%, #0f172a 100%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 24px 16px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: absolute;
+            top: -150px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 550px;
+            height: 550px;
+            background: radial-gradient(circle, rgba(255, 183, 3, 0.14) 0%, rgba(255, 183, 3, 0) 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .maint-container {
+            max-width: 560px;
+            width: 100%;
+            background: var(--card-bg);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 44px 34px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            position: relative;
+            z-index: 1;
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .maint-logo-wrap {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            padding: 14px 28px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        }
+        .maint-logo {
+            max-height: 58px;
+            max-width: 230px;
+            object-fit: contain;
+            display: block;
+        }
+        .maint-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 183, 3, 0.15);
+            border: 1px solid rgba(255, 183, 3, 0.4);
+            color: var(--yellow);
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 18px;
+            text-transform: uppercase;
+        }
+        .maint-badge-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--yellow);
+            border-radius: 50%;
+            animation: pulseDot 2s infinite;
+        }
+        @keyframes pulseDot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.35; transform: scale(0.85); }
+        }
+        .maint-title {
+            font-size: 27px;
+            font-weight: 800;
+            color: #ffffff;
+            line-height: 1.25;
+            margin-bottom: 12px;
+            letter-spacing: -0.4px;
+        }
+        .maint-desc {
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-muted);
+            margin-bottom: 30px;
+        }
+        .btn-emergency {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 16px 24px;
+            background: var(--yellow);
+            color: #0b1319;
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 700;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 25px -5px rgba(255, 183, 3, 0.35);
+        }
+        .btn-emergency:hover {
+            background: var(--yellow-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px -5px rgba(255, 183, 3, 0.45);
+        }
+        .btn-emergency:active {
+            transform: translateY(0);
+        }
+        .admin-footer-link {
+            display: inline-block;
+            margin-top: 24px;
+            font-size: 12px;
+            color: rgba(148, 163, 184, 0.65);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .admin-footer-link:hover {
+            color: var(--text-main);
+            text-decoration: underline;
+        }
+
+        /* Modal Contacto */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 7, 18, 0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.22s ease, visibility 0.22s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-card {
+            background: #ffffff;
+            color: #0f172a;
+            width: 100%;
+            max-width: 480px;
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+            transform: scale(0.94) translateY(10px);
+            transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+        }
+        .modal-overlay.active .modal-card {
+            transform: scale(1) translateY(0);
+        }
+        .modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+        .modal-header h3 {
+            font-size: 20px;
+            font-weight: 800;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .modal-close {
+            background: #f1f5f9;
+            border: none;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .modal-close:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+        .btn-whatsapp-direct {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            background: #25d366;
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 700;
+            padding: 14px;
+            border-radius: 12px;
+            text-decoration: none;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);
+            transition: background 0.2s, transform 0.2s;
+        }
+        .btn-whatsapp-direct:hover {
+            background: #20ba5a;
+            transform: translateY(-1px);
+        }
+        .contact-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            text-align: left;
+        }
+        .contact-icon {
+            font-size: 22px;
+            line-height: 1;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .contact-details h4 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 3px;
+        }
+        .contact-details p {
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.4;
+            margin-bottom: 4px;
+        }
+        .contact-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #0284c7;
+            text-decoration: none;
+        }
+        .contact-action:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 480px) {
+            .maint-container {
+                padding: 30px 18px;
+                border-radius: 20px;
+            }
+            .maint-title {
+                font-size: 23px;
+            }
+            .modal-card {
+                padding: 22px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="maint-container">
+    <div class="maint-logo-wrap">
+        <img src="<?= e($logo) ?>" alt="Serinsumos" class="maint-logo">
+    </div>
+
+    <div class="maint-badge">
+        <span class="maint-badge-dot"></span>
+        Modo Mantenimiento
+    </div>
+
+    <h1 class="maint-title">Estamos actualizando nuestro sitio</h1>
+    <p class="maint-desc">
+        Estamos realizando tareas técnicas y mejoras para brindarte una mejor experiencia en insumos y maquinarias para sublimación. Volvemos muy pronto.
+    </p>
+
+    <button type="button" class="btn-emergency" onclick="toggleModal(true)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+        </svg>
+        Contacto de Emergencia
+    </button>
+
+    <div>
+        <a href="<?= e(site_url('cuenta.php?admin=1')) ?>" class="admin-footer-link">
+            ¿Sos administrador? Iniciar sesión
+        </a>
+    </div>
+</div>
+
+<!-- Modal Contacto de Emergencia -->
+<div class="modal-overlay" id="emergencyModal" onclick="handleBackdropClick(event)">
+    <div class="modal-card">
+        <div class="modal-header">
+            <div>
+                <h3>🚨 Contacto de Emergencia</h3>
+                <p style="font-size:13px;color:#64748b;margin-top:2px">Comunicate directamente con nuestro equipo ante cualquier consulta o urgencia:</p>
+            </div>
+            <button type="button" class="modal-close" onclick="toggleModal(false)" aria-label="Cerrar">&times;</button>
+        </div>
+
+        <a href="<?= e($waUrl) ?>" target="_blank" rel="noopener noreferrer" class="btn-whatsapp-direct">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+            </svg>
+            Chatear por WhatsApp Urgencias
+        </a>
+
+        <div>
+            <div class="contact-item">
+                <span class="contact-icon">📍</span>
+                <div class="contact-details">
+                    <h4>Dirección del taller y depósito</h4>
+                    <p>Ramón Ocampo 1309, B° San Vicente, Córdoba, Argentina (CP 5006)</p>
+                    <a href="https://www.google.com/maps/search/?api=1&query=Ram%C3%B3n+Ocampo+1309+San+Vicente+C%C3%B3rdoba+Argentina+5006" target="_blank" rel="noopener noreferrer" class="contact-action">
+                        Abrir en Google Maps &rarr;
+                    </a>
+                </div>
+            </div>
+
+            <div class="contact-item">
+                <span class="contact-icon">📸</span>
+                <div class="contact-details">
+                    <h4>Instagram</h4>
+                    <p>Avisos, novedades y canales de contacto directo.</p>
+                    <a href="https://www.instagram.com/ser.insumos/" target="_blank" rel="noopener noreferrer" class="contact-action">
+                        @ser.insumos &rarr;
+                    </a>
+                </div>
+            </div>
+
+            <div class="contact-item" style="margin-bottom:0">
+                <span class="contact-icon">⏰</span>
+                <div class="contact-details">
+                    <h4>Horarios de atención</h4>
+                    <p>Lunes a Viernes de 9:00 a 18:00 hs.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleModal(show) {
+    var m = document.getElementById('emergencyModal');
+    if (!m) return;
+    if (show) {
+        m.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    } else {
+        m.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+function handleBackdropClick(e) {
+    if (e.target === document.getElementById('emergencyModal')) {
+        toggleModal(false);
+    }
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') toggleModal(false);
+});
+</script>
+
+</body>
+</html>
+<?php
+}
+
+function check_maintenance_mode(): void {
+    if (!is_maintenance_mode()) {
+        return;
+    }
+    if (is_admin()) {
+        return;
+    }
+    $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    if ($script === 'install.php') {
+        return;
+    }
+    // Permitir el acceso al formulario de login en cuenta.php para que el administrador pueda ingresar
+    if ($script === 'cuenta.php') {
+        if (!current_user()) {
+            return;
+        }
+    }
+    // Si es petición AJAX, devolver 503 JSON
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        http_response_code(503);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'Sitio en mantenimiento. Solo accesible para administradores.', 'maintenance' => true]);
+        exit;
+    }
+    http_response_code(503);
+    render_maintenance_page();
+    exit;
+}
+
 function site_header(string $title = '', string $description = ''): void {
     $name = setting('site_name', APP_NAME);
     $user = current_user();
@@ -257,6 +715,13 @@ function site_header(string $title = '', string $description = ''): void {
     <link rel="shortcut icon" href="<?= e($favicon) ?>">
 </head>
 <body id="top">
+
+<?php if (is_maintenance_mode() && is_admin()): ?>
+<div style="background:#dc2626;color:#ffffff;padding:9px 16px;text-align:center;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,0.25);">
+    <span>🛠️ <strong>MODO MANTENIMIENTO ACTIVO</strong> — La tienda está cerrada al público general (solo vos como Administrador podés verla).</span>
+    <a href="<?= e(site_url('admin.php?tab=configuracion#mantenimiento')) ?>" style="background:#ffffff;color:#dc2626;padding:4px 12px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:800;white-space:nowrap;">Desactivar en Admin &rarr;</a>
+</div>
+<?php endif; ?>
 
 <div class="topline">
     <div class="topline-inner">
@@ -1150,5 +1615,6 @@ function order_whatsapp_url(array $order): string {
 }
 
 require_installation();
+check_maintenance_mode();
 
 

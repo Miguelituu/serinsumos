@@ -329,6 +329,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 set_flash('success', '¡Favicon actualizado correctamente!');
             }
 
+        } elseif ($act === 'toggle_maintenance') {
+            $current = setting('maintenance_mode', '0');
+            $newVal = ($current === '1') ? '0' : '1';
+            save_setting('maintenance_mode', $newVal);
+            set_flash('success', $newVal === '1'
+                ? '¡Modo mantenimiento ACTIVADO! La web ahora está pausada para el público y solo es visible para administradores.'
+                : '¡Modo mantenimiento DESACTIVADO! La web vuelve a estar abierta al público general.');
+
         } else {
             set_flash('error', 'Acción no reconocida.');
         }
@@ -493,6 +501,24 @@ input:checked ~ .confirm-revoke { display:inline; }
     <p class="eyebrow blue">PANEL INTERNO</p>
     <h1>Administración</h1>
 
+    <?php if (setting('maintenance_mode', '0') === '1'): ?>
+        <div style="background:#fef2f2;border:2px solid #ef4444;border-radius:12px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;box-shadow:0 4px 12px rgba(239,68,68,0.12)">
+            <div style="display:flex;align-items:center;gap:12px">
+                <span style="font-size:28px;line-height:1">🛠️</span>
+                <div>
+                    <strong style="color:#991b1b;font-size:15px;display:block">Modo Mantenimiento está ACTIVADO</strong>
+                    <span style="color:#7f1d1d;font-size:13px">Los visitantes y clientes externos solo ven la pantalla con el logo y el botón de contacto de emergencia.</span>
+                </div>
+            </div>
+            <form method="post" style="margin:0">
+                <?= csrf_field() ?>
+                <input type="hidden" name="act" value="toggle_maintenance">
+                <input type="hidden" name="_tab" value="<?= e($tab) ?>">
+                <button class="btn btn-small" type="submit" style="background:#16a34a;color:#fff;border:none;font-weight:700;padding:8px 16px;border-radius:6px;cursor:pointer">✓ Desactivar y abrir sitio</button>
+            </form>
+        </div>
+    <?php endif; ?>
+
     <!-- Estadísticas rápidas -->
     <div class="admin-stats">
         <div class="admin-stat">
@@ -543,6 +569,9 @@ input:checked ~ .confirm-revoke { display:inline; }
         </a>
         <a href="admin.php?tab=configuracion"  class="<?= $tab === 'configuracion'  ? 'active' : '' ?>">
             ⚙️ Configuración
+            <?php if (setting('maintenance_mode', '0') === '1'): ?>
+                <span class="badge" style="margin-left:6px;background:#ef4444;color:#fff;font-weight:700">Mantenimiento ON</span>
+            <?php endif; ?>
         </a>
     </nav>
 
@@ -1996,6 +2025,52 @@ input:checked ~ .confirm-revoke { display:inline; }
          PESTAÑA: CONFIGURACIÓN
     ═══════════════════════════════════════════════════════════════════ -->
     <?php elseif ($tab === 'configuracion'): ?>
+
+        <!-- ── MODO MANTENIMIENTO ────────────────────────────────────────── -->
+        <div id="mantenimiento" style="background:<?= setting('maintenance_mode', '0') === '1' ? '#fff1f2' : '#f8fafc' ?>;border:2px solid <?= setting('maintenance_mode', '0') === '1' ? '#f43f5e' : 'var(--line)' ?>;border-radius:14px;padding:24px;margin-bottom:34px;max-width:760px;box-shadow:0 4px 14px rgba(0,0,0,0.03)">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:14px">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <span style="font-size:26px">🛠️</span>
+                    <div>
+                        <h2 style="margin:0;font-size:19px;color:var(--ink)">Modo Mantenimiento</h2>
+                        <span style="font-size:12px;color:var(--gray)">Control de acceso y visibilidad pública de la tienda</span>
+                    </div>
+                </div>
+                <div>
+                    <?php if (setting('maintenance_mode', '0') === '1'): ?>
+                        <span style="background:#ef4444;color:#fff;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:0.5px;display:inline-block">● MANTENIMIENTO ACTIVO</span>
+                    <?php else: ?>
+                        <span style="background:#22c55e;color:#fff;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:0.5px;display:inline-block">● SITIO ONLINE Y PÚBLICO</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <p style="font-size:13.5px;color:var(--ink);line-height:1.55;margin-bottom:18px">
+                Al activar el modo mantenimiento, cualquier persona o cliente que visite la tienda verá exclusivamente una pantalla limpia con el <strong>logo del negocio</strong> y un <strong>botón que abre el modal con los datos de contacto de emergencia</strong> (WhatsApp directo, dirección física en San Vicente e Instagram).
+                <br>
+                <span style="color:#64748b;font-size:12.5px;display:inline-block;margin-top:4px">
+                    🔒 <strong>Acceso restringido:</strong> Solo las cuentas con <strong>rol de administrador</strong> pueden ver y navegar el sitio completo mientras este modo esté activado.
+                </span>
+            </p>
+
+            <form method="post" style="margin:0">
+                <?= csrf_field() ?>
+                <input type="hidden" name="act"  value="toggle_maintenance">
+                <input type="hidden" name="_tab" value="configuracion">
+
+                <?php if (setting('maintenance_mode', '0') === '1'): ?>
+                    <button class="btn btn-small" type="submit" style="background:#16a34a;color:#fff;border:none;font-weight:700;padding:12px 22px;border-radius:8px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;gap:8px">
+                        ✓ Desactivar modo mantenimiento y abrir el sitio
+                    </button>
+                <?php else: ?>
+                    <button class="btn btn-small" type="submit" onclick="return confirm('¿Confirmás activar el modo mantenimiento? Los clientes solo verán el logo y botón de emergencia hasta que lo desactives.')" style="background:#dc2626;color:#fff;border:none;font-weight:700;padding:12px 22px;border-radius:8px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;gap:8px">
+                        ⚠️ Activar modo mantenimiento
+                    </button>
+                <?php endif; ?>
+            </form>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--line); margin:36px 0 28px">
 
         <h2>Logo principal del negocio</h2>
         <p>Actualizá el logo de Serinsumos. Se aplicará automáticamente en la cabecera, menú móvil, pie de página y vistas públicas.</p>
