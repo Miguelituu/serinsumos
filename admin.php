@@ -679,28 +679,41 @@ input:checked ~ .confirm-revoke { display:inline; }
 /* ── Constructor de presupuestos ────────────────────────────────────── */
 .quote-head, .quote-row {
     display: grid;
-    grid-template-columns: 2.2fr 1.7fr 78px 120px 36px;
+    /* minmax(0, …) evita que el campo de detalle (un input, que no baja de su
+       ancho intrínseco) aplaste al buscador de productos. */
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.7fr) 78px 120px 36px;
     gap: 10px;
-    align-items: center;
+    align-items: start;
 }
 .quote-head { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--gray); font-weight: 700; padding: 0 4px 6px; }
 .quote-row { margin-bottom: 10px; }
 .quote-row input { margin: 0; }
-.quote-del { border: 1px solid var(--line); background: #fff; color: var(--pink); border-radius: 8px; height: 44px; font-size: 18px; line-height: 1; cursor: pointer; }
+.quote-del { align-self: start; margin-top: 4px; border: 1px solid var(--line); background: #fff; color: var(--pink); border-radius: 8px; height: 44px; font-size: 18px; line-height: 1; cursor: pointer; }
 .quote-del:hover { background: #fff4f8; }
 .quote-actions { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 .quote-total { font-size: 13px; color: var(--gray); letter-spacing: .5px; }
 .quote-total b { font-family: Rubik, sans-serif; font-size: 20px; color: var(--ink); margin-left: 8px; }
 
 /* Buscador de productos dentro del constructor de presupuestos */
-.qpick { position: relative; min-width: 0; }
-.qpick > input { width: 100%; }
+.qpick { position: relative; display: flex; flex-direction: column; min-width: 0; }
+.qpick > input {
+    width: 100%;
+    padding-left: 40px;
+    background-color: #fff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23828d95' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.6-3.6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 13px center;
+    background-size: 17px 17px;
+}
 .qpick-menu {
     position: absolute;
     z-index: 60;
     top: calc(100% + 4px);
     left: 0;
-    right: 0;
+    right: auto;
+    /* Más ancho que el campo para que el nombre y las etiquetas entren cómodos */
+    width: max(100%, 440px);
+    max-width: calc(100vw - 48px);
     max-height: 330px;
     overflow-y: auto;
     background: #fff;
@@ -723,20 +736,24 @@ input:checked ~ .confirm-revoke { display:inline; }
 .qpick-info { min-width: 0; }
 .qpick-info b { display: block; font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.35; }
 .qpick-info small { display: block; margin-top: 3px; font-size: 11.5px; color: var(--gray); }
-.qpick-tags { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 48%; }
+.qpick-tags { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 40%; }
 .qpick-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 3px 7px; border-radius: 20px; white-space: nowrap; }
 .qpick-tag.ok   { background: #e7f7ef; color: #0f7a4f; }
 .qpick-tag.warn { background: #fff4e2; color: #a2610a; }
 .qpick-tag.off  { background: #f1f3f5; color: #6b7680; }
 .qpick-note { padding: 10px 12px; font-size: 12.5px; color: var(--gray); line-height: 1.5; }
-.qpick-meta { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 2px 0; }
+/* El aviso va debajo de toda la fila, alineado con el buscador */
+.qpick-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 5px; margin: -4px 2px 0; }
+.qpick-meta[hidden] { display: none; }
 .qpick-hint { font-size: 12px; color: var(--gray); margin: -4px 0 12px; }
 
 @media(max-width: 780px) {
     .quote-head { display: none; }
-    .quote-row { grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; }
+    .quote-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; }
     .quote-row .qpick, .quote-row input[name="item_detail[]"] { grid-column: 1 / -1; }
-    .quote-del { grid-column: 1 / -1; width: 100%; height: 36px; }
+    /* En una sola columna el aviso va antes del botón de borrar */
+    .quote-row .qpick-meta { order: 1; margin: 0; }
+    .quote-row .quote-del { order: 2; grid-column: 1 / -1; width: 100%; height: 36px; margin-top: 0; }
     .qpick-menu { max-height: 250px; }
 }
 
@@ -2512,14 +2529,14 @@ input:checked ~ .confirm-revoke { display:inline; }
                     <?php foreach ($quoteItems as $it): ?>
                     <div class="quote-row">
                         <div class="qpick">
-                            <input name="item_title[]" value="<?= e($it['title']) ?>" placeholder="Buscar producto o escribir un servicio" required autocomplete="off">
+                            <input name="item_title[]" value="<?= e($it['title']) ?>" placeholder="Buscar producto o servicio" required autocomplete="off">
                             <div class="qpick-menu" hidden></div>
-                            <div class="qpick-meta" hidden></div>
                         </div>
                         <input name="item_detail[]" value="<?= e($it['detail']) ?>" placeholder="Opcional">
                         <input name="item_qty[]"    type="number" step="0.01" min="0.01" value="<?= e(quote_fmt_qty((float)$it['qty'])) ?>" oninput="quoteRecalc()">
                         <input name="item_price[]"  type="number" step="0.01" min="0" value="<?= number_format((float)$it['price'], 2, '.', '') ?>" oninput="quoteRecalc()">
                         <button type="button" class="quote-del" onclick="this.closest('.quote-row').remove();quoteRecalc()" aria-label="Quitar artículo">×</button>
+                        <div class="qpick-meta" hidden></div>
                     </div>
                     <?php endforeach; ?>
                 </div>
@@ -2576,14 +2593,14 @@ input:checked ~ .confirm-revoke { display:inline; }
                 var row = document.createElement('div');
                 row.className = 'quote-row';
                 row.innerHTML = "<div class='qpick'>"
-                    + "<input name='item_title[]' placeholder='Buscar producto o escribir un servicio' required autocomplete='off'>"
+                    + "<input name='item_title[]' placeholder='Buscar producto o servicio' required autocomplete='off'>"
                     + "<div class='qpick-menu' hidden></div>"
-                    + "<div class='qpick-meta' hidden></div>"
                     + "</div>"
                     + "<input name='item_detail[]' placeholder='Opcional'>"
                     + "<input name='item_qty[]' type='number' step='0.01' min='0.01' value='1' oninput='quoteRecalc()'>"
                     + "<input name='item_price[]' type='number' step='0.01' min='0' value='0' oninput='quoteRecalc()'>"
-                    + "<button type='button' class='quote-del' aria-label='Quitar artículo' onclick=\"this.closest('.quote-row').remove();quoteRecalc()\">&times;</button>";
+                    + "<button type='button' class='quote-del' aria-label='Quitar artículo' onclick=\"this.closest('.quote-row').remove();quoteRecalc()\">&times;</button>"
+                    + "<div class='qpick-meta' hidden></div>";
                 wrap.appendChild(row);
                 var first = row.querySelector('input');
                 if (first) first.focus();
@@ -2623,7 +2640,7 @@ input:checked ~ .confirm-revoke { display:inline; }
                     });
                 }
                 function tagClass(flag) {
-                    if (flag === 'Sin stock' || flag === 'No publicable') return 'warn';
+                    if (flag === 'Sin stock' || flag === 'No publicable' || flag === 'Completá el precio') return 'warn';
                     if (flag === 'Oculto' || flag === 'Eliminado') return 'off';
                     return 'ok';
                 }
@@ -2638,10 +2655,10 @@ input:checked ~ .confirm-revoke { display:inline; }
 
                     var input = wrap.querySelector('input[name="item_title[]"]');
                     var menu  = wrap.querySelector('.qpick-menu');
-                    var meta  = wrap.querySelector('.qpick-meta');
+                    var meta  = row.querySelector('.qpick-meta');
                     if (!input || !menu) return;
 
-                    var items = [], active = -1, timer = null, seq = 0;
+                    var items = [], active = -1, timer = null, seq = 0, lastChoose = 0;
 
                     function close() { menu.hidden = true; active = -1; }
 
@@ -2668,7 +2685,8 @@ input:checked ~ .confirm-revoke { display:inline; }
                             if (it.sku) bits.push('SKU ' + it.sku);
                             bits.push(it.price_label ? it.price_label : 'sin precio cargado');
                             if (it.price_from) bits.push('precio ' + it.price_from);
-                            bits.push(it.stock_label);
+                            /* Sólo se informa el stock si la tienda realmente lo lleva */
+                            if (it.stock !== null && it.stock !== undefined) bits.push(it.stock_label);
                             html += '<div class="qpick-item" role="option" data-i="' + i + '">'
                                  +    '<span class="qpick-info"><b>' + esc(it.title) + '</b>'
                                  +    '<small>' + esc(bits.join(' · ')) + '</small></span>'
@@ -2683,6 +2701,11 @@ input:checked ~ .confirm-revoke { display:inline; }
                     function choose(i) {
                         var it = items[i];
                         if (!it) return;
+                        /* Evita elegir dos veces por el mismo toque (pointerdown + mousedown) */
+                        var now = Date.now();
+                        if (now - lastChoose < 400) return;
+                        lastChoose = now;
+
                         input.value = it.title;
 
                         var priceInput  = row.querySelector('input[name="item_price[]"]');
@@ -2714,13 +2737,21 @@ input:checked ~ .confirm-revoke { display:inline; }
                                 }
                             }
                         }
+                        /* Debajo del campo sólo se avisa lo que conviene mirar: si el
+                           artículo está oculto, sin stock, sin precio, etc. Los artículos
+                           normales no agregan nada y la fila queda limpia. */
                         if (meta) {
+                            var avisos = [];
+                            for (var f = 0; f < it.flags.length; f++) {
+                                if (it.flags[f] !== 'Local') avisos.push(it.flags[f]);
+                            }
+                            if (it.price === null || it.price === undefined) avisos.push('Completá el precio');
+                            if (typeof it.stock === 'number' && it.stock > 0) avisos.push(it.stock + ' en stock');
+
                             var html = '';
-                            for (var f = 0; f < it.flags.length; f++) html += tagHtml(it.flags[f]);
-                            if (it.price === null || it.price === undefined) html += tagHtml('Completá el precio');
-                            html += '<em class="qpick-tag off">' + esc(it.stock_label) + '</em>';
+                            for (var a = 0; a < avisos.length; a++) html += tagHtml(avisos[a]);
                             meta.innerHTML = html;
-                            meta.hidden = false;
+                            meta.hidden = avisos.length === 0;
                         }
                         close();
                         quoteRecalc();
@@ -2776,10 +2807,13 @@ input:checked ~ .confirm-revoke { display:inline; }
                             close();
                         }
                     });
-                    menu.addEventListener('mousedown', function (e) {
+                    /* Se elige al tocar/clickear. preventDefault sólo con mouse: en táctil
+                       hay que dejar pasar el gesto para poder scrollear el listado. */
+                    var downEvent = window.PointerEvent ? 'pointerdown' : 'mousedown';
+                    menu.addEventListener(downEvent, function (e) {
                         var el = e.target.closest ? e.target.closest('.qpick-item') : null;
                         if (!el) return;
-                        e.preventDefault();
+                        if (e.pointerType === undefined || e.pointerType === 'mouse') e.preventDefault();
                         choose(parseInt(el.getAttribute('data-i'), 10));
                     });
 
