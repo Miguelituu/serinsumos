@@ -691,11 +691,53 @@ input:checked ~ .confirm-revoke { display:inline; }
 .quote-actions { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 .quote-total { font-size: 13px; color: var(--gray); letter-spacing: .5px; }
 .quote-total b { font-family: Rubik, sans-serif; font-size: 20px; color: var(--ink); margin-left: 8px; }
+
+/* Buscador de productos dentro del constructor de presupuestos */
+.qpick { position: relative; min-width: 0; }
+.qpick > input { width: 100%; }
+.qpick-menu {
+    position: absolute;
+    z-index: 60;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 330px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 20px 45px rgba(23, 37, 48, .18);
+    padding: 6px;
+}
+.qpick-menu[hidden] { display: none; }
+.qpick-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.qpick-item:hover, .qpick-item.is-active { background: #f1f7fd; }
+.qpick-info { min-width: 0; }
+.qpick-info b { display: block; font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.qpick-info small { display: block; margin-top: 3px; font-size: 11.5px; color: var(--gray); }
+.qpick-tags { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 48%; }
+.qpick-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 3px 7px; border-radius: 20px; white-space: nowrap; }
+.qpick-tag.ok   { background: #e7f7ef; color: #0f7a4f; }
+.qpick-tag.warn { background: #fff4e2; color: #a2610a; }
+.qpick-tag.off  { background: #f1f3f5; color: #6b7680; }
+.qpick-note { padding: 10px 12px; font-size: 12.5px; color: var(--gray); line-height: 1.5; }
+.qpick-meta { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 2px 0; }
+.qpick-hint { font-size: 12px; color: var(--gray); margin: -4px 0 12px; }
+
 @media(max-width: 780px) {
     .quote-head { display: none; }
     .quote-row { grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; }
-    .quote-row input[name="item_title[]"], .quote-row input[name="item_detail[]"] { grid-column: 1 / -1; }
+    .quote-row .qpick, .quote-row input[name="item_detail[]"] { grid-column: 1 / -1; }
     .quote-del { grid-column: 1 / -1; width: 100%; height: 36px; }
+    .qpick-menu { max-height: 250px; }
 }
 
 @media(max-width: 700px) {
@@ -2454,6 +2496,11 @@ input:checked ~ .confirm-revoke { display:inline; }
                 </div>
 
                 <h3 style="margin:28px 0 14px">Artículos</h3>
+                <p class="qpick-hint">
+                    Escribí 2 o más letras y elegí el artículo del inventario: se completan el precio y el SKU.
+                    También aparecen los <b>ocultos, sin stock o dados de baja</b>, así podés cotizar servicios,
+                    ítems administrativos o productos a pedido. Si no querés buscarlo, escribilo a mano.
+                </p>
                 <div class="quote-head" aria-hidden="true">
                     <span>Producto / servicio</span>
                     <span>Detalle</span>
@@ -2464,7 +2511,11 @@ input:checked ~ .confirm-revoke { display:inline; }
                 <div id="quote-rows">
                     <?php foreach ($quoteItems as $it): ?>
                     <div class="quote-row">
-                        <input name="item_title[]"  value="<?= e($it['title']) ?>"  placeholder="Nombre del producto" required>
+                        <div class="qpick">
+                            <input name="item_title[]" value="<?= e($it['title']) ?>" placeholder="Buscar producto o escribir un servicio" required autocomplete="off">
+                            <div class="qpick-menu" hidden></div>
+                            <div class="qpick-meta" hidden></div>
+                        </div>
                         <input name="item_detail[]" value="<?= e($it['detail']) ?>" placeholder="Opcional">
                         <input name="item_qty[]"    type="number" step="0.01" min="0.01" value="<?= e(quote_fmt_qty((float)$it['qty'])) ?>" oninput="quoteRecalc()">
                         <input name="item_price[]"  type="number" step="0.01" min="0" value="<?= number_format((float)$it['price'], 2, '.', '') ?>" oninput="quoteRecalc()">
@@ -2524,7 +2575,11 @@ input:checked ~ .confirm-revoke { display:inline; }
                 if (!wrap) return;
                 var row = document.createElement('div');
                 row.className = 'quote-row';
-                row.innerHTML = "<input name='item_title[]' placeholder='Nombre del producto' required>"
+                row.innerHTML = "<div class='qpick'>"
+                    + "<input name='item_title[]' placeholder='Buscar producto o escribir un servicio' required autocomplete='off'>"
+                    + "<div class='qpick-menu' hidden></div>"
+                    + "<div class='qpick-meta' hidden></div>"
+                    + "</div>"
                     + "<input name='item_detail[]' placeholder='Opcional'>"
                     + "<input name='item_qty[]' type='number' step='0.01' min='0.01' value='1' oninput='quoteRecalc()'>"
                     + "<input name='item_price[]' type='number' step='0.01' min='0' value='0' oninput='quoteRecalc()'>"
@@ -2533,6 +2588,7 @@ input:checked ~ .confirm-revoke { display:inline; }
                 var first = row.querySelector('input');
                 if (first) first.focus();
                 quoteRecalc();
+                if (window.quotePickInit) window.quotePickInit(row);
             }
             function copyQuoteUrl(btn) {
                 var input = document.getElementById('quote-public-url');
@@ -2551,6 +2607,201 @@ input:checked ~ .confirm-revoke { display:inline; }
                 }
             }
             quoteRecalc();
+            </script>
+
+            <script>
+            /* Buscador de artículos del inventario para los presupuestos.
+               Incluye ocultos, sin stock y dados de baja: cotizar un ítem que no
+               está publicado es válido (servicios, ítems administrativos, a pedido). */
+            (function () {
+                var ENDPOINT = 'buscar-productos.php';
+                var cache = {};
+
+                function esc(v) {
+                    return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) {
+                        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                    });
+                }
+                function tagClass(flag) {
+                    if (flag === 'Sin stock' || flag === 'No publicable') return 'warn';
+                    if (flag === 'Oculto' || flag === 'Eliminado') return 'off';
+                    return 'ok';
+                }
+                function tagHtml(flag) {
+                    return '<em class="qpick-tag ' + tagClass(flag) + '">' + esc(flag) + '</em>';
+                }
+
+                function initRow(row) {
+                    var wrap = row && row.querySelector ? row.querySelector('.qpick') : null;
+                    if (!wrap || wrap.getAttribute('data-ready') === '1') return;
+                    wrap.setAttribute('data-ready', '1');
+
+                    var input = wrap.querySelector('input[name="item_title[]"]');
+                    var menu  = wrap.querySelector('.qpick-menu');
+                    var meta  = wrap.querySelector('.qpick-meta');
+                    if (!input || !menu) return;
+
+                    var items = [], active = -1, timer = null, seq = 0;
+
+                    function close() { menu.hidden = true; active = -1; }
+
+                    function highlight(i) {
+                        var all = menu.querySelectorAll('.qpick-item');
+                        for (var k = 0; k < all.length; k++) all[k].classList.toggle('is-active', k === i);
+                        active = i;
+                        if (all[i] && all[i].scrollIntoView) all[i].scrollIntoView({ block: 'nearest' });
+                    }
+
+                    function draw() {
+                        if (!items.length) {
+                            menu.innerHTML = '<div class="qpick-note">Sin coincidencias en el inventario. '
+                                + 'Podés escribir el ítem a mano y completar el precio.</div>';
+                            menu.hidden = false;
+                            return;
+                        }
+                        var html = '';
+                        for (var i = 0; i < items.length; i++) {
+                            var it = items[i];
+                            var tags = '';
+                            for (var f = 0; f < it.flags.length && f < 3; f++) tags += tagHtml(it.flags[f]);
+                            var bits = [];
+                            if (it.sku) bits.push('SKU ' + it.sku);
+                            bits.push(it.price_label ? it.price_label : 'sin precio cargado');
+                            if (it.price_from) bits.push('precio ' + it.price_from);
+                            bits.push(it.stock_label);
+                            html += '<div class="qpick-item" role="option" data-i="' + i + '">'
+                                 +    '<span class="qpick-info"><b>' + esc(it.title) + '</b>'
+                                 +    '<small>' + esc(bits.join(' · ')) + '</small></span>'
+                                 +    (tags ? '<span class="qpick-tags">' + tags + '</span>' : '')
+                                 +  '</div>';
+                        }
+                        menu.innerHTML = html;
+                        menu.hidden = false;
+                        active = -1;
+                    }
+
+                    function choose(i) {
+                        var it = items[i];
+                        if (!it) return;
+                        input.value = it.title;
+
+                        var priceInput  = row.querySelector('input[name="item_price[]"]');
+                        var detailInput = row.querySelector('input[name="item_detail[]"]');
+
+                        /* Precio: sólo con un valor confiable del inventario. Si el artículo
+                           no trae precio, se limpia el que hubiera puesto el buscador antes
+                           para no cotizar por error un número que era de otro producto. */
+                        if (priceInput) {
+                            if (it.price !== null && it.price !== undefined) {
+                                priceInput.value = Number(it.price).toFixed(2);
+                                priceInput.setAttribute('data-autofilled', '1');
+                            } else if (priceInput.getAttribute('data-autofilled') === '1') {
+                                priceInput.value = '';
+                                priceInput.removeAttribute('data-autofilled');
+                            }
+                        }
+
+                        /* Detalle (SKU / presentación): se completa si está vacío o si lo había
+                           puesto el buscador. Si el operador escribió algo propio, se respeta. */
+                        if (detailInput) {
+                            if (detailInput.value.trim() === '' || detailInput.getAttribute('data-autofilled') === '1') {
+                                if (it.detail_hint) {
+                                    detailInput.value = it.detail_hint;
+                                    detailInput.setAttribute('data-autofilled', '1');
+                                } else {
+                                    detailInput.value = '';
+                                    detailInput.removeAttribute('data-autofilled');
+                                }
+                            }
+                        }
+                        if (meta) {
+                            var html = '';
+                            for (var f = 0; f < it.flags.length; f++) html += tagHtml(it.flags[f]);
+                            if (it.price === null || it.price === undefined) html += tagHtml('Completá el precio');
+                            html += '<em class="qpick-tag off">' + esc(it.stock_label) + '</em>';
+                            meta.innerHTML = html;
+                            meta.hidden = false;
+                        }
+                        close();
+                        quoteRecalc();
+                    }
+
+                    function search() {
+                        var q = input.value.trim();
+                        if (q.length < 2) { close(); return; }
+                        var key = q.toLowerCase();
+                        if (cache[key]) { items = cache[key]; draw(); return; }
+                        var mine = ++seq;
+                        fetch(ENDPOINT + '?q=' + encodeURIComponent(q), {
+                            credentials: 'same-origin',
+                            headers: { 'Accept': 'application/json' }
+                        }).then(function (r) {
+                            return r.ok ? r.json() : null;
+                        }).then(function (data) {
+                            if (mine !== seq) return;
+                            items = (data && data.items) ? data.items : [];
+                            cache[key] = items;
+                            draw();
+                        }).catch(function () {
+                            if (mine !== seq) return;
+                            items = [];
+                            menu.innerHTML = '<div class="qpick-note">No pudimos consultar el inventario. '
+                                + 'Escribí el ítem a mano y completá el precio.</div>';
+                            menu.hidden = false;
+                        });
+                    }
+
+                    input.addEventListener('input', function () {
+                        if (meta) { meta.hidden = true; meta.innerHTML = ''; }
+                        if (timer) clearTimeout(timer);
+                        timer = setTimeout(search, 220);
+                    });
+                    input.addEventListener('focus', function () {
+                        if (input.value.trim().length >= 2 && items.length) draw();
+                    });
+                    input.addEventListener('blur', function () { setTimeout(close, 140); });
+                    input.addEventListener('keydown', function (e) {
+                        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                            if (menu.hidden || !items.length) return;
+                            e.preventDefault();
+                            var n = items.length;
+                            highlight(e.key === 'ArrowDown' ? (active + 1) % n : (active - 1 + n) % n);
+                        } else if (e.key === 'Enter') {
+                            if (!menu.hidden && items.length) {
+                                e.preventDefault();
+                                choose(active >= 0 ? active : 0);
+                            }
+                        } else if (e.key === 'Escape' && !menu.hidden) {
+                            e.preventDefault();
+                            close();
+                        }
+                    });
+                    menu.addEventListener('mousedown', function (e) {
+                        var el = e.target.closest ? e.target.closest('.qpick-item') : null;
+                        if (!el) return;
+                        e.preventDefault();
+                        choose(parseInt(el.getAttribute('data-i'), 10));
+                    });
+
+                    /* Si el operador escribe a mano, esos valores dejan de ser del inventario */
+                    var priceField  = row.querySelector('input[name="item_price[]"]');
+                    var detailField = row.querySelector('input[name="item_detail[]"]');
+                    if (priceField)  priceField.addEventListener('input', function () { priceField.removeAttribute('data-autofilled'); });
+                    if (detailField) detailField.addEventListener('input', function () { detailField.removeAttribute('data-autofilled'); });
+                }
+
+                function initAll() {
+                    var rows = document.querySelectorAll('#quote-rows .quote-row');
+                    for (var i = 0; i < rows.length; i++) initRow(rows[i]);
+                }
+
+                window.quotePickInit = initRow;
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', initAll);
+                } else {
+                    initAll();
+                }
+            })();
             </script>
 
         <?php endif; ?>

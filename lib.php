@@ -1266,6 +1266,153 @@ function get_products_with_overrides(int $limit = 200, bool $adminMode = false):
 
 
 
+/* ── Buscador de inventario (para armar presupuestos) ────────────────── */
+
+/**
+ * Normaliza un producto del inventario para el buscador de presupuestos.
+ *
+ * A propósito NO filtra por visibilidad ni por stock: los artículos ocultos,
+ * eliminados o sin stock también se pueden cotizar (ítems administrativos,
+ * servicios o pedidos a pedido). Cada fila avisa su estado real.
+ */
+function inventory_row(array $p): array {
+    $title    = trim((string)($p['_display_title'] ?? ''));
+    if ($title === '') $title = trim((string)($p['title'] ?? ''));
+    $original = trim((string)($p['title'] ?? ''));
+    $isLocal  = ($p['_source'] ?? '') === 'local';
+
+    /* SKU: el propio del producto local o el de la primera variante de la API */
+    $sku = trim((string)($p['_sku'] ?? ''));
+    if ($sku === '') {
+        foreach (($p['variants'] ?? []) as $v) {
+            $vs = trim((string)($v['sku'] ?? ''));
+            if ($vs !== '') { $sku = $vs; break; }
+        }
+    }
+
+    /* Stock: sólo cuando la tienda lleva inventario de esa variante */
+    $tracked  = false;
+    $qty      = 0;
+    $anyAvail = false;
+    foreach (($p['variants'] ?? []) as $v) {
+        $q = $v['inventory_quantity'] ?? null;
+        if (!empty($v['manage_inventory']) && $q !== null) {
+            $tracked = true;
+            $q       = max(0, (int)$q);
+            $qty    += $q;
+            if ($q > 0) $anyAvail = true;
+        } elseif (empty($v['manage_inventory'])) {
+            $anyAvail = true; /* sin control de stock se considera disponible */
+        }
+    }
+    $inStock = !$tracked || $anyAvail;
+
+    /* Precio: el cargado a mano (local u override) o el de la tienda si está en pesos */
+    $override  = $p['_override'] ?? null;
+    $priceNum  = null;
+    $priceFrom = '';
+    if ($isLocal) {
+        $raw = $p['_local_row']['price'] ?? null;
+        if ($raw !== null && (float)$raw > 0) { $priceNum = (float)$raw; $priceFrom = 'propio'; }
+    } elseif (is_array($override) && ($override['price_override'] ?? null) !== null && (float)$override['price_override'] > 0) {
+        $priceNum  = (float)$override['price_override'];
+        $priceFrom = 'propio';
+    } else {
+        $info   = is_array($p['currency_info'] ?? null) ? $p['currency_info'] : null;
+        $code   = is_array($info) ? strtolower((string)($info['code'] ?? '')) : '';
+        $digits = is_array($info) && is_numeric($info['decimal_digits'] ?? null) ? (int)$info['decimal_digits'] : 2;
+        $cents  = (int)($p['price_in_cents'] ?? 0);
+        if ($code === 'ars' && $cents > 0) { $priceNum = $cents / (10 ** $digits); $priceFrom = 'tienda'; }
+    }
+    $priceLabel = trim((string)($p['_local_price'] ?? ''));
+    if ($priceLabel === '') $priceLabel = trim((string)($p['price_formatted'] ?? ''));
+
+    $deleted = !empty($p['_deleted']);
+    $visible = !empty($p['_visible']) && !$deleted;
+
+    $flags = [];
+    if ($isLocal)      $flags[] = 'Local';
+    if ($deleted)      $flags[] = 'Eliminado';
+    elseif (!$visible) $flags[] = 'Oculto';
+    if (!$inStock)     $flags[] = 'Sin stock';
+    if (!$isLocal && ($p['purchasable'] ?? true) === false) $flags[] = 'No publicable';
+
+    $unit = trim((string)($p['_unit_of_sale'] ?? ''));
+    $pack = isset($p['_pack_quantity']) && $p['_pack_quantity'] !== null ? (int)$p['_pack_quantity'] : null;
+
+    $detailBits = [];
+    if ($sku !== '') $detailBits[] = 'SKU ' . $sku;
+    if ($unit !== '' && $unit !== 'unidad') $detailBits[] = $unit;
+    if ($pack !== null && $pack > 1) $detailBits[] = 'x' . $pack;
+
+    return [
+        'title'       => $title,
+        'original'    => ($original !== '' && $original !== $title) ? $original : '',
+        'sku'         => $sku,
+        'unit'        => $unit,
+        'pack'        => $pack,
+        'source'      => $isLocal ? 'local' : 'api',
+        'price'       => $priceNum,
+        'price_from'  => $priceFrom,
+        'price_label' => $priceLabel,
+        'stock'       => $tracked ? $qty : null,
+        'stock_label' => !$tracked ? 'Sin control de stock' : ($qty > 0 ? $qty . ' en stock' : 'Sin stock'),
+        'in_stock'    => $inStock,
+        'active'      => $visible,
+        'flags'       => $flags,
+        'detail_hint' => implode(' · ', $detailBits),
+    ];
+}
+
+/** Puntaje de coincidencia: cuanto más bajo, mejor posición en la lista. */
+function inventory_search_score(array $row, string $needle): int {
+    $t = mb_strtolower($row['title']);
+    if (str_starts_with($t, $needle)) return 0;
+    foreach (preg_split('/\s+/', $t) ?: [] as $word) {
+        if ($word !== '' && str_starts_with($word, $needle)) return 1;
+    }
+    if (str_contains($t, $needle)) return 2;
+    if ($row['sku'] !== '' && str_contains(mb_strtolower($row['sku']), $needle)) return 3;
+    return 4;
+}
+
+/**
+ * Busca artículos en el inventario (incluye ocultos, eliminados y sin stock).
+ * Devuelve ['items' => [...], 'catalog_error' => bool].
+ */
+function search_inventory(string $query, int $limit = 12): array {
+    $query = trim($query);
+    if (mb_strlen($query) < 2) return ['items' => [], 'catalog_error' => false];
+    $needle = mb_strtolower($query);
+    $limit  = max(1, min(40, $limit));
+
+    $catalog = get_products_with_overrides(200, true);
+    $rows    = [];
+
+    foreach (($catalog['products'] ?? []) as $p) {
+        $row = inventory_row($p);
+        $hay = mb_strtolower($row['title'] . ' ' . $row['original'] . ' ' . $row['sku'] . ' ' . (string)($p['_category'] ?? ''));
+        if (!str_contains($hay, $needle)) continue;
+        $row['_score'] = inventory_search_score($row, $needle);
+        $rows[] = $row;
+    }
+
+    usort($rows, static function (array $a, array $b): int {
+        if ($a['_score'] !== $b['_score']) return $a['_score'] <=> $b['_score'];
+        if ($a['active'] !== $b['active'])  return $a['active'] ? -1 : 1;   /* activos primero */
+        if ($a['in_stock'] !== $b['in_stock']) return $a['in_stock'] ? -1 : 1;
+        return strcmp($a['title'], $b['title']);
+    });
+
+    $out = [];
+    foreach (array_slice($rows, 0, $limit) as $r) {
+        unset($r['_score']);
+        $out[] = $r;
+    }
+
+    return ['items' => $out, 'catalog_error' => !empty($catalog['error'])];
+}
+
 /**
  * Guarda (insert o update) un override en la BD.
  * @param array $data Claves: label, price_override, currency_symbol, category, notes, visible, sort_order, image_url
