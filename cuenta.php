@@ -159,44 +159,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('cuenta.php?pedido=' . $orderId);
     }
 
-    /* Subida de comprobante para documentos manuales (compatibilidad) */
-    if ($act === 'upload_receipt') {
-        require_login();
-        $u = current_user();
-        $docId = (int)($_POST['document_id'] ?? 0);
-        $st = db()->prepare('SELECT id FROM payment_documents WHERE id=? AND owner_id=? AND enabled=1 LIMIT 1');
-        $st->execute([$docId, (int)$u['id']]);
-        if (!$st->fetchColumn()) {
-            set_flash('error', 'Este comprobante no está habilitado para tu cuenta.');
-            redirect('cuenta.php');
-        }
-        $file = $_FILES['receipt'] ?? null;
-        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || (int)$file['size'] > 10 * 1024 * 1024) {
-            set_flash('error', 'Elegí un archivo válido de hasta 10 MB.');
-            redirect('cuenta.php');
-        }
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->file($file['tmp_name']);
-        $extensions = ['application/pdf'=>'pdf', 'image/jpeg'=>'jpg', 'image/png'=>'png'];
-        if (!isset($extensions[$mime])) {
-            set_flash('error', 'Formato no permitido. Usá PDF, JPG o PNG.');
-            redirect('cuenta.php');
-        }
-        $uploadDir = __DIR__ . '/uploads/receipts';
-        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0750, true) && !is_dir($uploadDir)) {
-            set_flash('error', 'No se pudo preparar la carpeta para comprobantes.');
-            redirect('cuenta.php');
-        }
-        $filename = 'receipt_' . $docId . '_' . bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
-        if (!move_uploaded_file($file['tmp_name'], $uploadDir . '/' . $filename)) {
-            set_flash('error', 'No se pudo guardar el comprobante.');
-            redirect('cuenta.php');
-        }
-        $st = db()->prepare('UPDATE payment_documents SET receipt_path=?, updated_at=NOW() WHERE id=? AND owner_id=?');
-        $st->execute([$filename, $docId, (int)$u['id']]);
-        set_flash('success', 'Comprobante adjuntado correctamente.');
-        redirect('cuenta.php');
-    }
 }
 
 $user = current_user();
@@ -215,8 +177,6 @@ $myOrders = [];
 $selectedOrder = null;
 $selectedOrderItems = [];
 $bankDetails = get_bank_details();
-$docs = [];
-
 if ($user) {
     $myOrders = get_orders((int)$user['id']);
     $reqOrderId = (int)($_GET['pedido'] ?? 0);
@@ -233,9 +193,6 @@ if ($user) {
         $selectedOrderItems = get_order_items((int)$selectedOrder['id']);
     }
 
-    $stmt = db()->prepare('SELECT * FROM payment_documents WHERE owner_id=? ORDER BY created_at DESC');
-    $stmt->execute([(int)$user['id']]);
-    $docs = $stmt->fetchAll();
 }
 
 site_header('Cuenta mayorista', 'Registrá tu negocio, revisá tus pedidos, realizá transferencias y adjuntá comprobantes.');
@@ -718,31 +675,6 @@ site_header('Cuenta mayorista', 'Registrá tu negocio, revisá tus pedidos, real
             </div>
         <?php endif; ?>
 
-    <?php endif; ?>
-
-    <!-- Documentos de pago manuales previos (compatibilidad) -->
-    <?php if (!empty($docs)): ?>
-        <h2 style="margin-top:40px">Comprobantes solicitados adicionales</h2>
-        <?php foreach ($docs as $d): ?>
-            <div class="access-box">
-                <h3>Referencia <?= e($d['order_reference']) ?></h3>
-                <p><?= nl2br(e($d['instructions'])) ?></p>
-                <?php if ($d['receipt_path']): ?>
-                    <p>Comprobante adjuntado: <a href="<?= e(site_url('ver-comprobante.php?id=' . (int)$d['id'])) ?>" target="_blank">Ver comprobante ↗</a></p>
-                <?php endif; ?>
-                <?php if ((int)$d['enabled'] === 1 && empty($d['receipt_path'])): ?>
-                    <form method="post" enctype="multipart/form-data">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="act" value="upload_receipt">
-                        <input type="hidden" name="document_id" value="<?= (int)$d['id'] ?>">
-                        <label>Adjuntar comprobante (PDF, JPG o PNG · máx. 10 MB)
-                            <input type="file" name="receipt" accept="application/pdf,image/jpeg,image/png" required>
-                        </label>
-                        <button class="btn yellow" type="submit">Subir comprobante</button>
-                    </form>
-                <?php endif; ?>
-            </div>
-        <?php endforeach; ?>
     <?php endif; ?>
 
 <?php else: ?>
