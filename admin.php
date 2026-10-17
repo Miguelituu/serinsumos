@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/lib.php';
 require_once __DIR__ . '/lib_inventario.php';
+require_once __DIR__ . '/lib_mayoristas.php';
 require_staff();
 
 /* ── Procesar POST ───────────────────────────────────────────────────── */
@@ -36,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'toggle_banner'        => 'banners',
             'save_quote'           => 'presupuestos',
             'delete_quote'         => 'presupuestos',
+            'save_mayoristas_content' => 'mayoristas',
             'save_whatsapp'        => 'configuracion',
             'save_bank_settings'   => 'configuracion',
             'save_site_logo'       => 'configuracion',
@@ -482,6 +484,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($act === 'delete_quote') {
             delete_quote_by_id((int)($_POST['quote_id'] ?? 0));
             set_flash('success', 'Presupuesto eliminado.');
+
+        } elseif ($act === 'save_mayoristas_content') {
+            save_mayoristas_content($_POST);
+            set_flash('success', 'El contenido de la página Mayoristas se guardó correctamente.');
 
         /* ── Instagram (portada) ─────────────────────────────────────── */
         } elseif ($act === 'save_instagram_handle') {
@@ -1041,6 +1047,11 @@ input:checked ~ .confirm-revoke { display:inline; }
             <?php if ($quotesTotal > 0): ?>
                 <span class="badge badge-gray" style="margin-left:6px"><?= $quotesTotal ?></span>
             <?php endif; ?>
+        </a>
+        <?php endif; ?>
+        <?php if (can('mayoristas')): ?>
+        <a href="admin.php?tab=mayoristas" class="<?= $tab === 'mayoristas' ? 'active' : '' ?>">
+            🏪 Mayoristas
         </a>
         <?php endif; ?>
         <?php if (can('banners')): ?>
@@ -2659,6 +2670,112 @@ input:checked ~ .confirm-revoke { display:inline; }
         </script>
 
         <?php endif; ?>
+
+    <?php elseif ($tab === 'mayoristas'): ?>
+
+        <?php
+        $mayContent = mayoristas_content();
+        $mayTextarea = static function (string $name, string $label, string $value, int $rows = 2): void {
+            echo '<label class="may-admin-field"><span>' . e($label) . '</span><textarea name="' . e($name) . '" rows="' . $rows . '" maxlength="3000">' . e($value) . '</textarea></label>';
+        };
+        ?>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px">
+            <div>
+                <h2 style="margin:0">Contenido de Mayoristas</h2>
+                <p style="margin:5px 0 0;color:var(--gray);font-size:14px;max-width:760px">
+                    Editá los textos de la página pública. Se conservan el diseño, los íconos y los enlaces funcionales de registro, WhatsApp y catálogo.
+                </p>
+            </div>
+            <a class="btn outline btn-small" href="<?= e(site_url('mayoristas.php')) ?>" target="_blank" rel="noopener">Ver página pública ↗</a>
+        </div>
+        <style>
+            .may-admin-group { background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;margin:0 0 18px; }
+            .may-admin-group h3 { margin:0 0 16px;font-size:16px; }
+            .may-admin-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px; }
+            .may-admin-grid .wide { grid-column:1 / -1; }
+            .may-admin-field { display:block;margin:0; }
+            .may-admin-field span { display:block;font-size:12px;font-weight:700;color:var(--gray);margin-bottom:6px; }
+            .may-admin-field textarea { display:block;width:100%;min-height:62px;resize:vertical;font:inherit;font-size:13px;line-height:1.5;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink); }
+            .may-admin-field textarea:focus { outline:2px solid rgba(57,174,242,.25);border-color:var(--blue); }
+            @media(max-width:700px){.may-admin-grid{grid-template-columns:1fr}.may-admin-grid .wide{grid-column:auto}.may-admin-group{padding:17px}}
+        </style>
+        <form method="post">
+            <?= csrf_field() ?>
+            <input type="hidden" name="act" value="save_mayoristas_content">
+            <input type="hidden" name="_tab" value="mayoristas">
+
+            <section class="may-admin-group">
+                <h3>Presentación principal</h3>
+                <div class="may-admin-grid">
+                    <?php $mayTextarea('visual_title','Texto del panel visual',$mayContent['visual_title'],2); ?>
+                    <?php $mayTextarea('eyebrow','Etiqueta superior',$mayContent['eyebrow']); ?>
+                    <?php $mayTextarea('title','Título principal',$mayContent['title'],2); ?>
+                    <?php $mayTextarea('intro_one','Primer párrafo',$mayContent['intro_one'],4); ?>
+                    <?php $mayTextarea('intro_two','Segundo párrafo',$mayContent['intro_two'],3); ?>
+                    <?php foreach ($mayContent['chips'] as $i => $text) $mayTextarea('chips['.$i.']','Etiqueta visual '.($i+1),$text); ?>
+                    <?php foreach ($mayContent['bullets'] as $i => $text) $mayTextarea('bullets['.$i.']','Beneficio breve '.($i+1),$text); ?>
+                    <?php $mayTextarea('register_button','Texto del botón de registro',$mayContent['register_button']); ?>
+                    <?php $mayTextarea('whatsapp_button','Texto del botón de WhatsApp',$mayContent['whatsapp_button']); ?>
+                </div>
+            </section>
+
+            <section class="may-admin-group">
+                <h3>Tarjetas de beneficios</h3>
+                <div class="may-admin-grid">
+                    <?php foreach ($mayContent['benefits'] as $i => $item): ?>
+                        <?php $mayTextarea('benefits['.$i.'][title]','Beneficio '.($i+1).' · título',$item['title']); ?>
+                        <?php $mayTextarea('benefits['.$i.'][text]','Beneficio '.($i+1).' · descripción',$item['text'],3); ?>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+
+            <section class="may-admin-group">
+                <h3>Cómo funciona</h3>
+                <div class="may-admin-grid">
+                    <?php $mayTextarea('steps_eyebrow','Etiqueta de sección',$mayContent['steps_eyebrow']); ?>
+                    <?php $mayTextarea('steps_title','Título de sección',$mayContent['steps_title'],2); ?>
+                    <?php foreach ($mayContent['steps'] as $i => $item): ?>
+                        <?php $mayTextarea('steps['.$i.'][title]','Paso '.($i+1).' · título',$item['title']); ?>
+                        <?php $mayTextarea('steps['.$i.'][text]','Paso '.($i+1).' · descripción',$item['text'],3); ?>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+
+            <section class="may-admin-group">
+                <h3>Información para asesorarte</h3>
+                <div class="may-admin-grid">
+                    <?php $mayTextarea('request_eyebrow','Etiqueta de sección',$mayContent['request_eyebrow']); ?>
+                    <?php $mayTextarea('request_title','Título',$mayContent['request_title']); ?>
+                    <?php $mayTextarea('request_body','Descripción',$mayContent['request_body'],3); ?>
+                    <?php $mayTextarea('request_card_title','Título de la lista',$mayContent['request_card_title']); ?>
+                    <?php foreach ($mayContent['request_list'] as $i => $text) $mayTextarea('request_list['.$i.']','Dato solicitado '.($i+1),$text,2); ?>
+                </div>
+            </section>
+
+            <section class="may-admin-group">
+                <h3>Preguntas frecuentes</h3>
+                <div class="may-admin-grid">
+                    <?php $mayTextarea('faq_eyebrow','Etiqueta de sección',$mayContent['faq_eyebrow']); ?>
+                    <?php $mayTextarea('faq_title','Título de sección',$mayContent['faq_title']); ?>
+                    <?php foreach ($mayContent['faqs'] as $i => $item): ?>
+                        <?php $mayTextarea('faqs['.$i.'][question]','Pregunta '.($i+1),$item['question']); ?>
+                        <?php $mayTextarea('faqs['.$i.'][answer]','Respuesta '.($i+1),$item['answer'],3); ?>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+
+            <section class="may-admin-group">
+                <h3>Llamado final a la acción</h3>
+                <div class="may-admin-grid">
+                    <?php $mayTextarea('cta_title','Título',$mayContent['cta_title']); ?>
+                    <?php $mayTextarea('cta_body','Descripción',$mayContent['cta_body'],3); ?>
+                    <?php $mayTextarea('cta_register_button','Texto del botón de registro',$mayContent['cta_register_button']); ?>
+                    <?php $mayTextarea('cta_catalog_button','Texto del botón del catálogo',$mayContent['cta_catalog_button']); ?>
+                </div>
+            </section>
+
+            <button class="btn yellow" type="submit">Guardar cambios de Mayoristas</button>
+        </form>
 
     <!-- ══════════════════════════════════════════════════════════════════
          PESTAÑA: BANNERS

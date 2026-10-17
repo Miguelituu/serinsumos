@@ -101,7 +101,7 @@ function require_admin(): void { require_login(); if (!is_admin()) { http_respon
 
 /** Todas las pestañas del panel, en orden de aparición. */
 function panel_tabs(): array {
-    return ['clientes', 'pedidos', 'productos', 'banners', 'presupuestos', 'configuracion'];
+    return ['clientes', 'pedidos', 'productos', 'banners', 'presupuestos', 'mayoristas', 'configuracion'];
 }
 /** Pestañas que un administrador puede delegar a un empleado. */
 function delegable_tabs(): array {
@@ -115,6 +115,7 @@ function panel_tab_labels(): array {
         'productos'     => '📦 Productos',
         'banners'       => '🖼️ Banners',
         'presupuestos'  => '📝 Presupuestos',
+        'mayoristas'    => '🏪 Página Mayoristas',
         'configuracion' => '⚙️ Configuración',
     ];
 }
@@ -2431,5 +2432,4 @@ function save_instagram_posts(array $posts): void {
 require_installation();
 ensure_extended_schema();
 check_maintenance_mode();
-
 

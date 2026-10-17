@@ -1,10 +1,13 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/lib_mayoristas.php';
+
+$mayoristas = mayoristas_content();
 
 site_header(
     'Mayoristas',
-    'Comprá al por mayor en Serinsumos: insumos, papeles, tintas y maquinarias para sublimación y estampado con precios mayoristas, stock revisado, asesoramiento y envíos a todo el país.'
+    $mayoristas['intro_one']
 );
 
 page_hero('Mayoristas', '<a href="' . e(site_url('index.php')) . '">Inicio</a> / Mayoristas', 'VENTA MAYORISTA');
@@ -292,29 +295,27 @@ page_hero('Mayoristas', '<a href="' . e(site_url('index.php')) . '">Inicio</a> /
     <section class="may-intro">
         <div class="may-visual">
             <img src="<?= e(site_logo()) ?>" alt="Serinsumos">
-            <p class="may-visual-title">Tu cuenta mayorista,<br><b>lista para producir.</b></p>
+            <p class="may-visual-title"><?= nl2br(e($mayoristas['visual_title'])) ?></p>
             <div class="may-chips">
-                <span>Talleres</span>
-                <span>Gráficas</span>
-                <span>Comercios</span>
-                <span>Emprendedores</span>
+                <?php foreach ($mayoristas['chips'] as $chip): ?>
+                    <?php if (trim((string)$chip) !== ''): ?><span><?= e($chip) ?></span><?php endif; ?>
+                <?php endforeach; ?>
             </div>
         </div>
 
         <div class="may-copy">
-            <p class="eyebrow blue">COMPRÁ AL POR MAYOR</p>
-            <h2>Precios mayoristas<br>para tu negocio.</h2>
-            <p>En <b>Serinsumos</b> trabajamos con talleres, gráficas, comercios y emprendedores que reponen insumos todo el año. Con tu cuenta mayorista accedés a precios exclusivos y a un equipo que te ayuda a elegir lo que mejor rinde.</p>
-            <p>Revisamos cada solicitud a mano, así que no vas a comprar nada que no podamos entregarte.</p>
+            <p class="eyebrow blue"><?= e($mayoristas['eyebrow']) ?></p>
+            <h2><?= nl2br(e($mayoristas['title'])) ?></h2>
+            <p><?= nl2br(e($mayoristas['intro_one'])) ?></p>
+            <p><?= nl2br(e($mayoristas['intro_two'])) ?></p>
             <ul>
-                <li>Precios mayoristas en todo el catálogo</li>
-                <li>Stock revisado antes de confirmar tu pedido</li>
-                <li>Asesoramiento para elegir insumos y equipos</li>
-                <li>Envíos a todo el país o retiro en el local</li>
+                <?php foreach ($mayoristas['bullets'] as $bullet): ?>
+                    <?php if (trim((string)$bullet) !== ''): ?><li><?= e($bullet) ?></li><?php endif; ?>
+                <?php endforeach; ?>
             </ul>
             <div class="may-actions">
-                <a class="btn yellow" href="<?= e(site_url('cuenta.php?registro=1')) ?>">Solicitar cuenta mayorista →</a>
-                <a class="btn outline" href="<?= e(whatsapp_url('Hola Serinsumos, quisiera consultar por la venta mayorista.')) ?>" target="_blank" rel="noopener noreferrer">Consultar por WhatsApp</a>
+                <a class="btn yellow" href="<?= e(site_url('cuenta.php?registro=1')) ?>"><?= e($mayoristas['register_button']) ?></a>
+                <a class="btn outline" href="<?= e(whatsapp_url('Hola Serinsumos, quisiera consultar por la venta mayorista.')) ?>" target="_blank" rel="noopener noreferrer"><?= e($mayoristas['whatsapp_button']) ?></a>
             </div>
         </div>
     </section>
@@ -325,109 +326,88 @@ page_hero('Mayoristas', '<a href="' . e(site_url('index.php')) . '">Inicio</a> /
             <div class="icon" style="background:#eff6ff">
                 <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="18" fill="#39aef2"/><circle cx="17.5" cy="17.5" r="3.2" fill="#ffe72e"/><circle cx="30.5" cy="30.5" r="3.2" fill="#ffe72e"/><path d="M31 17 17 31" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>
             </div>
-            <h3>Precios mayoristas</h3>
-            <p>Accedé a la lista de precios para clientes aprobados en todos los productos de la tienda.</p>
+            <h3><?= e($mayoristas['benefits'][0]['title']) ?></h3>
+            <p><?= nl2br(e($mayoristas['benefits'][0]['text'])) ?></p>
         </article>
 
         <article class="may-benefit">
             <div class="icon" style="background:#fffbeb">
                 <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5 42 14v20L24 43 6 34V14L24 5Z" fill="#39aef2"/><path d="M6 14v20l18 9V23L6 14Z" fill="#2a93d0" opacity=".45"/><path d="M24 5 42 14 24 23 6 14 24 5Z" fill="#ffe72e"/><path d="M24 23v20" fill="none" stroke="#172530" stroke-width="2" opacity=".3"/></svg>
             </div>
-            <h3>Stock revisado</h3>
-            <p>Verificamos la disponibilidad física antes de confirmar cada pedido, para que no compres lo que no podemos entregar.</p>
+            <h3><?= e($mayoristas['benefits'][1]['title']) ?></h3>
+            <p><?= nl2br(e($mayoristas['benefits'][1]['text'])) ?></p>
         </article>
 
         <article class="may-benefit">
             <div class="icon" style="background:#fdf2f8">
                 <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 12h30v18a6 6 0 0 1-6 6H15a6 6 0 0 1-6-6V12Z" fill="#39aef2"/><path d="M15 12l3-6h12l3 6" fill="none" stroke="#39aef2" stroke-width="3" stroke-linejoin="round"/><circle cx="18" cy="22" r="2.4" fill="#fff"/><circle cx="30" cy="22" r="2.4" fill="#fff"/><path d="M18 29h12" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg>
             </div>
-            <h3>Atención personalizada</h3>
-            <p>Te respondemos por WhatsApp o en el local, con recomendaciones según lo que producís.</p>
+            <h3><?= e($mayoristas['benefits'][2]['title']) ?></h3>
+            <p><?= nl2br(e($mayoristas['benefits'][2]['text'])) ?></p>
         </article>
 
         <article class="may-benefit">
             <div class="icon" style="background:#eff6ff">
                 <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="3" y="14" width="24" height="18" rx="2.5" fill="#ed3285"/><path d="M27 20h8l6 6v6h-14Z" fill="#ed3285" opacity=".75"/><circle cx="12" cy="35" r="4" fill="#172530"/><circle cx="34" cy="35" r="4" fill="#172530"/><rect x="8" y="18" width="7" height="6" rx="1" fill="#ffe72e"/></svg>
             </div>
-            <h3>Envíos a todo el país</h3>
-            <p>Despachamos por expresos y transportes, o coordinamos el retiro en el local cuando te queda más cómodo.</p>
+            <h3><?= e($mayoristas['benefits'][3]['title']) ?></h3>
+            <p><?= nl2br(e($mayoristas['benefits'][3]['text'])) ?></p>
         </article>
     </section>
 
     <!-- ── Cómo funciona ────────────────────────────────────────────── -->
     <section class="may-steps">
-        <p class="eyebrow">PASO A PASO</p>
-        <h2>Comprar al por mayor,<br>sin complicaciones.</h2>
+        <p class="eyebrow"><?= e($mayoristas['steps_eyebrow']) ?></p>
+        <h2><?= nl2br(e($mayoristas['steps_title'])) ?></h2>
         <ol>
-            <li>
-                <b>01</b>
-                <h3>Registrá tu negocio</h3>
-                <p>Completá tus datos en el registro mayorista. Revisamos y aprobamos tu cuenta manualmente.</p>
-            </li>
-            <li>
-                <b>02</b>
-                <h3>Armá tu pedido</h3>
-                <p>Ya con la cuenta aprobada vas a ver los precios mayoristas. Cargá tu pedido desde la tienda o mandanos el detalle.</p>
-            </li>
-            <li>
-                <b>03</b>
-                <h3>Confirmamos y coordinamos</h3>
-                <p>Verificamos stock e importe final antes del pago. Cuando habilitemos tu pedido, adjuntás el comprobante desde tu cuenta.</p>
-            </li>
+            <?php foreach ($mayoristas['steps'] as $i => $step): ?>
+                <li>
+                    <b><?= e(str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT)) ?></b>
+                    <h3><?= e($step['title']) ?></h3>
+                    <p><?= nl2br(e($step['text'])) ?></p>
+                </li>
+            <?php endforeach; ?>
         </ol>
     </section>
 
     <!-- ── Qué nos ayuda a asesorarte ───────────────────────────────── -->
     <section class="may-req">
         <div>
-            <p class="eyebrow blue">ANTES DE ARRANCAR</p>
-            <h2>Contanos sobre tu negocio.</h2>
-            <p>No hace falta que tengas todo resuelto: si nos contás cómo trabajás, te armamos una propuesta con los insumos y equipos que mejor se adaptan a tu producción.</p>
+            <p class="eyebrow blue"><?= e($mayoristas['request_eyebrow']) ?></p>
+            <h2><?= e($mayoristas['request_title']) ?></h2>
+            <p><?= nl2br(e($mayoristas['request_body'])) ?></p>
         </div>
         <div class="may-req-card">
-            <h3>Nos ayuda saber</h3>
+            <h3><?= e($mayoristas['request_card_title']) ?></h3>
             <ul>
-                <li>Tu rubro: sublimación, estampado, gráfica, marroquinería o regalería</li>
-                <li>Si producís vos, revendés o hacés las dos cosas</li>
-                <li>Tu zona, para calcular el envío y los tiempos de entrega</li>
-                <li>Los insumos que necesitás reponer con más frecuencia</li>
+                <?php foreach ($mayoristas['request_list'] as $item): ?>
+                    <?php if (trim((string)$item) !== ''): ?><li><?= e($item) ?></li><?php endif; ?>
+                <?php endforeach; ?>
             </ul>
         </div>
     </section>
 
     <!-- ── Preguntas frecuentes ─────────────────────────────────────── -->
     <section class="faq may-faq">
-        <p class="eyebrow blue">ANTES DE EMPEZAR</p>
-        <h2>Resolvemos tus dudas.</h2>
-        <details>
-            <summary>¿Cómo accedo a los precios mayoristas?</summary>
-            <p>Registrá tu negocio desde el formulario de registro. Revisamos la solicitud manualmente y, cuando la aprobamos, vas a ver los precios en toda la tienda.</p>
-        </details>
-        <details>
-            <summary>¿Puedo comprar sin tener cuenta?</summary>
-            <p>Sí. Podés consultar por un producto o enviarnos el detalle de tu pedido por WhatsApp. Los precios mayoristas se muestran a los clientes con cuenta aprobada.</p>
-        </details>
-        <details>
-            <summary>¿Cuándo tengo que pagar?</summary>
-            <p>No transfieras antes de que confirmemos el stock y el importe final. Cuando habilitemos tu pedido, vas a poder cargar el comprobante desde tu cuenta.</p>
-        </details>
-        <details>
-            <summary>¿Hacen envíos a todo el país?</summary>
-            <p>Sí. Despachamos por expresos y transportes a todo el país y también podés retirar en el local de San Vicente, Córdoba.</p>
-        </details>
-        <details>
-            <summary>¿Buscan insumos que no están en la tienda?</summary>
-            <p>Escribinos con lo que necesitás. Si no lo tenemos publicado, lo buscamos y te avisamos disponibilidad y precio.</p>
-        </details>
+        <p class="eyebrow blue"><?= e($mayoristas['faq_eyebrow']) ?></p>
+        <h2><?= e($mayoristas['faq_title']) ?></h2>
+        <?php foreach ($mayoristas['faqs'] as $faq): ?>
+            <?php if (trim((string)$faq['question']) !== '' || trim((string)$faq['answer']) !== ''): ?>
+                <details>
+                    <summary><?= e($faq['question']) ?></summary>
+                    <p><?= nl2br(e($faq['answer'])) ?></p>
+                </details>
+            <?php endif; ?>
+        <?php endforeach; ?>
     </section>
 
     <!-- ── CTA final ────────────────────────────────────────────────── -->
     <section class="may-cta">
-        <h2>¿Arrancamos con tu cuenta mayorista?</h2>
-        <p>Registrate y empezá a ver precios pensados para tu negocio, con stock revisado y asesoramiento real.</p>
+        <h2><?= e($mayoristas['cta_title']) ?></h2>
+        <p><?= nl2br(e($mayoristas['cta_body'])) ?></p>
         <div class="actions">
-            <a class="btn yellow" href="<?= e(site_url('cuenta.php?registro=1')) ?>">Solicitar cuenta mayorista →</a>
-            <a class="btn outline" href="<?= e(site_url('catalogo.php')) ?>">Ver el catálogo</a>
+            <a class="btn yellow" href="<?= e(site_url('cuenta.php?registro=1')) ?>"><?= e($mayoristas['cta_register_button']) ?></a>
+            <a class="btn outline" href="<?= e(site_url('catalogo.php')) ?>"><?= e($mayoristas['cta_catalog_button']) ?></a>
         </div>
     </section>
 
