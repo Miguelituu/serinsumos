@@ -634,8 +634,6 @@ function catalog_query(array $changes = []): string {
         </aside>
 
     </div><!-- /.shop-layout -->
-
-    <a class="shop-top" href="#top" aria-label="Volver arriba">↑</a>
 </main>
 
 <script>
