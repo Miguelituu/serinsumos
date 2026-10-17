@@ -722,8 +722,25 @@ function site_header(string $title = '', string $description = ''): void {
     <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.1">
     <link rel="icon" href="<?= e($favicon) ?>">
     <link rel="shortcut icon" href="<?= e($favicon) ?>">
+    <style>
+        /* Overlay de carga: CSS critico en linea para que se vea bien aunque site.css tarde en cargar */
+        #site-loader{position:fixed;inset:0;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:#ffffff;transition:opacity .45s ease,visibility .45s ease}
+        #site-loader.site-loader--hidden{opacity:0;visibility:hidden;pointer-events:none}
+        #site-loader .site-loader-logo{width:60%;max-width:200px;height:auto;display:block;animation:siteLoaderPulse 1.5s ease-in-out infinite}
+        #site-loader .site-loader-bar{width:150px;max-width:60%;height:4px;border-radius:4px;background:#eef2f6;overflow:hidden;position:relative}
+        #site-loader .site-loader-bar::after{content:"";position:absolute;top:0;bottom:0;left:-40%;width:40%;border-radius:4px;background:linear-gradient(90deg,#ed3285,#39aef2);animation:siteLoaderBar 1.1s ease-in-out infinite}
+        @keyframes siteLoaderPulse{0%,100%{opacity:1}50%{opacity:.5}}
+        @keyframes siteLoaderBar{0%{left:-40%}100%{left:100%}}
+        @media (prefers-reduced-motion:reduce){#site-loader .site-loader-logo{animation:none}#site-loader .site-loader-bar::after{animation:none;left:0;width:100%}}
+    </style>
 </head>
 <body id="top">
+
+<div id="site-loader" role="status" aria-live="polite" aria-label="Cargando sitio">
+    <img class="site-loader-logo" src="<?= e($logo) ?>" alt="Serinsumos" fetchpriority="high">
+    <span class="site-loader-bar" aria-hidden="true"></span>
+</div>
+<noscript><style>#site-loader{display:none!important}</style></noscript>
 
 <?php if (is_maintenance_mode() && is_admin()): ?>
 <div style="background:#dc2626;color:#ffffff;padding:9px 16px;text-align:center;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,0.25);">
@@ -869,6 +886,41 @@ function site_footer(): void {
 <a class="floating-wa" href="<?= e(whatsapp_url()) ?>" target="_blank" rel="noopener noreferrer" aria-label="Contactar por WhatsApp">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.6a8.7 8.7 0 0 1-12.9 7.6L3 20.5l1.3-4.8A8.7 8.7 0 1 1 21 11.6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.2 8.1c.3-.6.6-.6.9-.6h.4c.2 0 .4 0 .5.4l.7 1.6c.1.3.1.4-.1.6l-.5.6c-.2.2-.2.4-.1.6.5.9 1.2 1.5 2.1 1.9.2.1.4.1.6-.1l.7-.8c.2-.2.4-.2.7-.1l1.5.7c.3.1.4.3.4.5 0 .3-.2 1.2-.7 1.5-.5.4-1.1.6-1.8.4-1-.2-2.2-.8-3.4-1.9-1-.9-1.8-2.1-2-2.8-.3-.8 0-1.7.3-2.5Z" fill="currentColor"/></svg>
 </a>
+
+<script>
+(function () {
+    var loader = document.getElementById('site-loader');
+    if (!loader) return;
+    var done = false;
+    function hideLoader() {
+        if (done) return;
+        done = true;
+        loader.classList.add('site-loader--hidden');
+        window.setTimeout(function () {
+            if (loader.parentNode) loader.parentNode.removeChild(loader);
+        }, 500);
+    }
+    function hideIfComplete() {
+        if (document.readyState === 'complete') hideLoader();
+    }
+    if (document.readyState === 'complete') {
+        hideLoader();
+    } else {
+        window.addEventListener('load', hideLoader, { once: true });
+        document.addEventListener('DOMContentLoaded', hideIfComplete);
+        document.addEventListener('readystatechange', hideIfComplete);
+        /* Respaldo: sondeo por si los eventos no llegan (evita carrera con 'load') */
+        var poll = window.setInterval(function () {
+            if (document.readyState === 'complete') {
+                window.clearInterval(poll);
+                hideLoader();
+            }
+        }, 120);
+    }
+    /* Red de seguridad: nunca dejar el overlay pegado si un recurso tarda demasiado */
+    window.setTimeout(hideLoader, 6000);
+})();
+</script>
 </body>
 </html>
 <?php }

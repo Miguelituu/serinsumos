@@ -1,6 +1,7 @@
 # Entorno y credenciales locales
 config.php
 config.produccion.php
+deploy_ftp.php
 
 # Almacenamiento temporal y logs
 storage/
