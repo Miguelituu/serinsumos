@@ -8,13 +8,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'login') {
         $email = lower_email(trim((string)($_POST['email'] ?? '')));
         $password = (string)($_POST['password'] ?? '');
-        $stmt = db()->prepare('SELECT id, password_hash FROM users WHERE email=? LIMIT 1');
+        $stmt = db()->prepare('SELECT id, password_hash, role FROM users WHERE email=? LIMIT 1');
         $stmt->execute([$email]);
         $row = $stmt->fetch();
         if ($row && password_verify($password, (string)$row['password_hash'])) {
             session_regenerate_id(true);
             $_SESSION['user_id'] = (int)$row['id'];
             set_flash('success', 'Ingresaste a tu cuenta.');
+            /* Administradores y empleados van directo al panel de gestión. */
+            if (in_array((string)$row['role'], ['admin', 'employee'], true)) {
+                redirect('admin.php');
+            }
             redirect('cuenta.php');
         }
         set_flash('error', 'Revisá tu correo y contraseña.');
@@ -392,8 +396,8 @@ site_header('Cuenta mayorista', 'Registrá tu negocio, revisá tus pedidos, real
             </p>
         </div>
         <div style="display:flex;gap:10px;align-items:center">
-            <?php if ($user['role'] === 'admin'): ?>
-                <a class="btn outline btn-small" href="<?= e(site_url('admin.php')) ?>">⚙️ Panel Admin</a>
+            <?php if (in_array((string)$user['role'], ['admin', 'employee'], true)): ?>
+                <a class="btn outline btn-small" href="<?= e(site_url('admin.php')) ?>">⚙️ Panel de Gestión</a>
             <?php endif; ?>
             <form method="post" style="margin:0">
                 <?= csrf_field() ?>

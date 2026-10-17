@@ -18,7 +18,7 @@ if (!$product) {
 }
 
 /* Verificar visibilidad: clientes no ven productos ocultos */
-if (!$product['_visible'] && !is_admin()) {
+if (!$product['_visible'] && !is_staff()) {
     http_response_code(404);
     site_header('Producto no disponible');
     echo '<main class="page-narrow">
@@ -87,7 +87,7 @@ site_header($displayTitle, $pageDesc);
             <div class="detail-main-image image-placeholder">Imagen no disponible</div>
         <?php endif; ?>
 
-        <?php if (is_admin() && $product['_override']): ?>
+        <?php if (can('productos') && $product['_override']): ?>
             <!-- Nota interna para admin -->
             <?php $adminNote = $product['_notes']; ?>
             <?php if ($adminNote !== ''): ?>
@@ -235,9 +235,9 @@ site_header($displayTitle, $pageDesc);
         </small>
 
         <!-- Enlace al admin -->
-        <?php if (is_admin()): ?>
+        <?php if (can('productos')): ?>
             <div style="margin-top:20px;padding:14px;background:#f3f5f7;border-radius:8px;font-size:13px">
-                <b>Admin:</b>
+                <b>Panel:</b>
                 <a href="<?= e(site_url('admin.php?tab=productos')) ?>" style="color:var(--blue)">
                     Editar override en el panel →
                 </a>

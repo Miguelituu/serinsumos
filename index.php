@@ -92,9 +92,72 @@ $totalBanners = count($banners);
     </a>
 </section>
 <section class="products"><div class="section-heading"><div><p class="eyebrow blue">EQUIPÁ TU PRÓXIMO PROYECTO</p><h2>Elegidos para crear.</h2></div><a href="<?= e(site_url('catalogo.php')) ?>">Ver todos los productos →</a></div><?php if (!empty($catalog['error']) && !$products): ?><p class="system-note">No pudimos cargar el catálogo ahora. Revisá la conexión con la tienda online de Hostinger.</p><?php elseif (!$products): ?><p>Próximamente vas a encontrar nuestros productos en el catálogo.</p><?php else: ?><div class="product-grid"><?php foreach (array_slice($products, 0, 4) as $p) render_product_card($p); ?></div><?php endif; ?></section>
+<section class="home-values">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow blue">CÓMO TRABAJAMOS</p>
+            <h2>Todo listo para que produzcas.</h2>
+        </div>
+        <a href="<?= e(site_url('nosotros.php')) ?>">Conocé Serinsumos →</a>
+    </div>
+    <div class="home-values-grid">
+        <article class="home-value">
+            <div class="icon" style="background:#eff6ff">
+                <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 12h30v18a6 6 0 0 1-6 6H15a6 6 0 0 1-6-6V12Z" fill="#39aef2"/><path d="M15 12l3-6h12l3 6" fill="none" stroke="#39aef2" stroke-width="3" stroke-linejoin="round"/><circle cx="18" cy="22" r="2.4" fill="#fff"/><circle cx="30" cy="22" r="2.4" fill="#fff"/><path d="M18 29h12" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg>
+            </div>
+            <h3>Atención personalizada</h3>
+            <p>Te respondemos de verdad, por WhatsApp o en el local, con recomendaciones según lo que necesitás producir.</p>
+        </article>
+        <article class="home-value">
+            <div class="icon" style="background:#fffbeb">
+                <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5 42 14v20L24 43 6 34V14L24 5Z" fill="#39aef2"/><path d="M6 14v20l18 9V23L6 14Z" fill="#2a93d0" opacity=".45"/><path d="M24 5 42 14 24 23 6 14 24 5Z" fill="#ffe72e"/><path d="M24 23v20" fill="none" stroke="#172530" stroke-width="2" opacity=".3"/></svg>
+            </div>
+            <h3>Stock revisado</h3>
+            <p>Verificamos la disponibilidad física antes de confirmar cada pedido, para que no compres lo que no podemos entregar.</p>
+        </article>
+        <article class="home-value">
+            <div class="icon" style="background:#fdf2f8">
+                <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="3" y="14" width="24" height="18" rx="2.5" fill="#ed3285"/><path d="M27 20h8l6 6v6h-14Z" fill="#ed3285" opacity=".75"/><circle cx="12" cy="35" r="4" fill="#172530"/><circle cx="34" cy="35" r="4" fill="#172530"/><rect x="8" y="18" width="7" height="6" rx="1" fill="#ffe72e"/></svg>
+            </div>
+            <h3>Envíos a todo el país</h3>
+            <p>Despachamos por expresos y transportes, o coordinamos el retiro en el local cuando te queda más cómodo.</p>
+        </article>
+    </div>
+</section>
 <section class="story" id="nosotros"><div class="story-image"><img loading="lazy" src="https://alpha-color.ancorathemes.com/wp-content/uploads/2017/04/image-30.jpg" alt="Colores y herramientas para impresión"><span>Más que insumos.<br><b>Un aliado para tu negocio.</b></span></div><div><p class="eyebrow blue">CREAMOS CON VOS</p><h2>Vos ponés la idea.<br>Nosotros, el color.</h2><p>Acompañamos a emprendedores, talleres y negocios con insumos y equipos para sublimación y estampado. Encontrá lo que necesitás para dar el siguiente paso.</p><ul><li>✓ Atención personalizada</li><li>✓ Compras mayoristas con revisión de stock</li><li>✓ Asesoramiento para elegir tu equipo</li></ul><a href="<?= e(whatsapp_url('Hola, quisiera asesoramiento para mi proyecto de sublimación.')) ?>" target="_blank" rel="noopener noreferrer" class="btn yellow">Hablemos de tu proyecto →</a></div></section>
 <section class="wholesale" id="mayoristas"><div><p class="eyebrow">PENSADO PARA TU NEGOCIO</p><h2>Comprar al por mayor,<br>sin complicaciones.</h2><a class="btn yellow" href="<?= e(site_url('cuenta.php?registro=1')) ?>">Solicitar cuenta mayorista →</a></div><ol><li><b>01</b><div><h3>Registrá tu negocio</h3><p>Completá tus datos. Revisamos y aprobamos tu cuenta manualmente.</p></div></li><li><b>02</b><div><h3>Armá tu pedido</h3><p>Accedé a precios mayoristas y enviá tu pedido con el pago coordinado.</p></div></li><li><b>03</b><div><h3>Confirmamos y coordinamos</h3><p>Verificamos stock antes del pago. Cuando habilitemos tu pedido, podrás adjuntar el comprobante en tu cuenta.</p></div></li></ol></section>
 <section class="faq"><p class="eyebrow blue">ANTES DE EMPEZAR</p><h2>Resolvemos tus dudas.</h2><details><summary>¿Por qué no puedo ver los precios?</summary><p>Los precios se muestran a clientes con cuenta mayorista aprobada. Registrate y esperá nuestra revisión.</p></details><details><summary>¿Cuándo tengo que pagar?</summary><p>No transfieras antes de que confirmemos el stock y el importe final. Te habilitaremos la carga del comprobante en tu cuenta.</p></details><details><summary>¿Puedo comprar por WhatsApp?</summary><p>Sí. Podés consultar por un producto o enviar el detalle de tu pedido para coordinar la compra.</p></details></section>
+<?php $igPosts = instagram_posts(); ?>
+<?php if ($igPosts): ?>
+<section class="home-insta">
+    <div class="home-insta-inner">
+        <div class="home-insta-head">
+            <div>
+                <p class="eyebrow">SEGUINOS EN INSTAGRAM</p>
+                <h2>Últimos trabajos<br>y novedades.</h2>
+                <p>Mirá lo que estamos creando y enterate primero de los ingresos, combos y promos. Etiquetanos con <b><?= e(instagram_handle()) ?></b> y mostrá tu producción.</p>
+            </div>
+            <a class="btn yellow" href="<?= e(instagram_profile_url()) ?>" target="_blank" rel="noopener noreferrer">Ver <?= e(instagram_handle()) ?> ↗</a>
+        </div>
+        <div class="home-insta-grid">
+            <?php foreach (array_slice($igPosts, 0, 6) as $igPost):
+                $igLink = $igPost['link'] !== '' ? $igPost['link'] : instagram_profile_url();
+                $igAlt  = $igPost['caption'] !== '' ? $igPost['caption'] : 'Publicación de Instagram de Serinsumos';
+            ?>
+            <a href="<?= e($igLink) ?>" target="_blank" rel="noopener noreferrer" aria-label="Ver la publicación en Instagram">
+                <img loading="lazy" src="<?= e($igPost['image']) ?>" alt="<?= e($igAlt) ?>">
+                <span class="ig-ico" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="1.9"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.4" cy="6.6" r="1.15" fill="#fff" stroke="none"/></svg>
+                </span>
+                <?php if ($igPost['caption'] !== ''): ?>
+                    <span class="ig-cap"><?= e($igPost['caption']) ?></span>
+                <?php endif; ?>
+            </a>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</section>
+<?php endif; ?>
 </main>
 <script>
 (function () {

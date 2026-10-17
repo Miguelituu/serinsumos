@@ -14,6 +14,10 @@ Thumbs.db
 uploads/receipts/*
 !uploads/receipts/.gitkeep
 
+# Imágenes de Instagram subidas desde el panel (se generan en el servidor)
+uploads/instagram/*
+!uploads/instagram/.gitkeep
+
 # Archivos de respaldo o empaquetados
 *.zip
 *.bak

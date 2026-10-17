@@ -79,17 +79,142 @@ function current_user(): ?array {
     $id = (int)($_SESSION['user_id'] ?? 0);
     if ($id < 1) return null;
     try {
-        $q = db()->prepare('SELECT id,name,business,phone,email,role,wholesale_approved,created_at FROM users WHERE id=? LIMIT 1');
+        $cols = 'id,name,business,phone,email,role,wholesale_approved,created_at';
+        if (users_have_perms_column()) $cols .= ',perms';
+        $q = db()->prepare("SELECT $cols FROM users WHERE id=? LIMIT 1");
         $q->execute([$id]);
         $u = $q->fetch();
         if (!$u) { unset($_SESSION['user_id']); return null; }
+        if (!isset($u['perms'])) $u['perms'] = '';
         return $u;
     } catch (Throwable) { return null; }
 }
 function is_admin(): bool { return (current_user()['role'] ?? '') === 'admin'; }
+function is_employee(): bool { return (current_user()['role'] ?? '') === 'employee'; }
+/** ¿La sesión actual pertenece a alguien que puede entrar al panel (admin o empleado)? */
+function is_staff(): bool { $r = (string)(current_user()['role'] ?? ''); return $r === 'admin' || $r === 'employee'; }
 function is_verified(): bool { $u = current_user(); return (bool)($u && ((int)$u['wholesale_approved'] === 1 || $u['role'] === 'admin')); }
 function require_login(): void { if (!current_user()) { set_flash('error', 'Ingresá con tu cuenta para continuar.'); redirect('cuenta.php'); } }
 function require_admin(): void { require_login(); if (!is_admin()) { http_response_code(403); exit('No tenés permisos para acceder a esta sección.'); } }
+
+/* ── Panel: pestañas y permisos por usuario ──────────────────────────── */
+
+/** Todas las pestañas del panel, en orden de aparición. */
+function panel_tabs(): array {
+    return ['clientes', 'pedidos', 'productos', 'banners', 'presupuestos', 'configuracion'];
+}
+/** Pestañas que un administrador puede delegar a un empleado. */
+function delegable_tabs(): array {
+    return ['clientes', 'pedidos', 'productos', 'presupuestos'];
+}
+/** Etiquetas legibles de cada pestaña (para la gestión de usuarios). */
+function panel_tab_labels(): array {
+    return [
+        'clientes'      => '👥 Clientes',
+        'pedidos'       => '🛒 Pedidos',
+        'productos'     => '📦 Productos',
+        'banners'       => '🖼️ Banners',
+        'presupuestos'  => '📝 Presupuestos',
+        'configuracion' => '⚙️ Configuración',
+    ];
+}
+/**
+ * Pestañas permitidas para un usuario. Los administradores ven todo;
+ * los empleados solo lo que se les habilitó (columna users.perms).
+ */
+function staff_perms(?array $user = null): array {
+    $u = $user ?? current_user();
+    if (!$u) return [];
+    if ((string)($u['role'] ?? '') === 'admin') return panel_tabs();
+    $list = array_filter(array_map('trim', explode(',', (string)($u['perms'] ?? ''))));
+    return array_values(array_intersect($list, delegable_tabs()));
+}
+/** ¿El usuario actual puede ver/operar la pestaña $tab? */
+function can(string $tab, ?array $user = null): bool {
+    return in_array($tab, staff_perms($user), true);
+}
+/** Exige sesión de panel (y, si se indica, permiso sobre esa pestaña). */
+function require_staff(string $tab = ''): void {
+    require_login();
+    if (!is_staff()) { http_response_code(403); exit('No tenés permisos para acceder a esta sección.'); }
+    if ($tab !== '' && !can($tab)) { http_response_code(403); exit('No tenés permisos para acceder a esta sección.'); }
+}
+
+/* ── Migraciones de esquema (idempotentes, se auto-reparan) ──────────── */
+
+/** ¿La tabla users ya tiene la columna perms? Si no, la crea. */
+function users_have_perms_column(): bool {
+    static $has = null;
+    if ($has !== null) return $has;
+    try {
+        $has = (bool)db()->query("SHOW COLUMNS FROM users LIKE 'perms'")->fetch();
+        if (!$has) {
+            db()->exec("ALTER TABLE users ADD COLUMN perms VARCHAR(255) NOT NULL DEFAULT '' AFTER role");
+            $has = (bool)db()->query("SHOW COLUMNS FROM users LIKE 'perms'")->fetch();
+        }
+    } catch (Throwable) { $has = false; }
+    return $has;
+}
+
+/** ¿El enum role admite 'employee'? Si no, lo amplía. */
+function users_support_employee_role(): bool {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        $col = db()->query("SHOW COLUMNS FROM users LIKE 'role'")->fetch();
+        $ok = (bool)($col && stripos((string)($col['Type'] ?? ''), 'employee') !== false);
+        if (!$ok) {
+            db()->exec("ALTER TABLE users MODIFY COLUMN role ENUM('admin','customer','employee') NOT NULL DEFAULT 'customer'");
+            $ok = true;
+        }
+    } catch (Throwable) { $ok = false; }
+    return $ok;
+}
+
+/** Crea la tabla de presupuestos si no existe. */
+function quotes_table_ready(): bool {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS quotes (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            number VARCHAR(40) NOT NULL,
+            token VARCHAR(64) NOT NULL,
+            client_name VARCHAR(190) NOT NULL DEFAULT '',
+            client_business VARCHAR(190) NOT NULL DEFAULT '',
+            client_phone VARCHAR(60) NOT NULL DEFAULT '',
+            client_email VARCHAR(190) NOT NULL DEFAULT '',
+            client_address VARCHAR(255) NOT NULL DEFAULT '',
+            items_json LONGTEXT NOT NULL,
+            note TEXT NOT NULL,
+            total DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+            currency_symbol VARCHAR(10) NOT NULL DEFAULT '$',
+            valid_days INT NOT NULL DEFAULT 7,
+            created_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_quotes_token (token),
+            UNIQUE KEY uniq_quotes_number (number)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $ok = true;
+    } catch (Throwable) { $ok = false; }
+    return $ok;
+}
+
+/** Ejecuta las migraciones de esquema una sola vez (marcador en settings). */
+function ensure_extended_schema(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        if (setting('schema_extended', '') === '1') return;
+        users_support_employee_role();
+        users_have_perms_column();
+        quotes_table_ready();
+        save_setting('schema_extended', '1');
+    } catch (Throwable) { /* se reintenta en el próximo request */ }
+}
 function require_verified(): void { require_login(); if (!is_verified()) { set_flash('error', 'Tu cuenta debe estar aprobada para consultar precios y armar pedidos.'); redirect('cuenta.php'); } }
 function cart_items(): array { $cart = $_SESSION['cart'] ?? []; return is_array($cart) ? $cart : []; }
 function cart_count(): int { $total = 0; foreach (cart_items() as $item) $total += max(0, (int)($item['quantity'] ?? 0)); return $total; }
@@ -674,7 +799,7 @@ function check_maintenance_mode(): void {
     if (!is_maintenance_mode()) {
         return;
     }
-    if (is_admin()) {
+    if (is_staff()) {
         return;
     }
     $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
@@ -743,7 +868,7 @@ function site_header(string $title = '', string $description = ''): void {
     <meta name="theme-color" content="#172530">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.5">
+    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.6">
     <link rel="icon" href="<?= e($favicon) ?>">
     <link rel="shortcut icon" href="<?= e($favicon) ?>">
     <script>document.documentElement.className += ' has-js';</script>
@@ -767,9 +892,9 @@ function site_header(string $title = '', string $description = ''): void {
 </div>
 <noscript><style>#site-loader{display:none!important}</style></noscript>
 
-<?php if (is_maintenance_mode() && is_admin()): ?>
+<?php if (is_maintenance_mode() && is_staff()): ?>
 <div style="background:#dc2626;color:#ffffff;padding:9px 16px;text-align:center;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,0.25);">
-    <span>🛠️ <strong>MODO MANTENIMIENTO ACTIVO</strong> — La tienda está cerrada al público general (solo vos como Administrador podés verla).</span>
+    <span>🛠️ <strong>MODO MANTENIMIENTO ACTIVO</strong> — La tienda está cerrada al público general (solo el equipo del panel puede verla).</span>
     <a href="<?= e(site_url('admin.php?tab=configuracion#mantenimiento')) ?>" style="background:#ffffff;color:#dc2626;padding:4px 12px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:800;white-space:nowrap;">Desactivar en Admin &rarr;</a>
 </div>
 <?php endif; ?>
@@ -833,8 +958,8 @@ function site_header(string $title = '', string $description = ''): void {
         <a href="<?= e(site_url('contacto.php')) ?>" class="<?= $currentScript === 'contacto.php' ? 'active' : '' ?>">💬 Contacto / Ubicación</a>
         <a href="<?= e(site_url('cuenta.php')) ?>">👤 Mi cuenta mayorista</a>
         <a href="<?= e(site_url('carrito.php')) ?>">🛒 Mi pedido <?= cart_count() > 0 ? '(' . cart_count() . ')' : '' ?></a>
-        <?php if (is_admin()): ?>
-            <a href="<?= e(site_url('admin.php')) ?>" style="color:var(--pink);font-weight:700">⚙️ Panel Administrador</a>
+        <?php if (is_staff()): ?>
+            <a href="<?= e(site_url('admin.php')) ?>" style="color:var(--pink);font-weight:700">⚙️ Panel de Gestión</a>
         <?php endif; ?>
     </div>
     <div class="mobile-drawer-footer">
@@ -889,8 +1014,8 @@ function site_footer(): void {
             <a href="<?= e(site_url('cuenta.php')) ?>">Ingresar a mi cuenta</a>
             <a href="<?= e(site_url('cuenta.php?registro=1')) ?>">Registrar mi negocio</a>
             <a href="<?= e(site_url('cuenta.php?recuperar=1')) ?>">Recuperar contraseña</a>
-            <?php if (is_admin()): ?>
-                <a href="<?= e(site_url('admin.php')) ?>" style="color:var(--blue);font-weight:600">Panel de Administración</a>
+            <?php if (is_staff()): ?>
+                <a href="<?= e(site_url('admin.php')) ?>" style="color:var(--blue);font-weight:600">Panel de Gestión</a>
             <?php endif; ?>
         </div>
 
@@ -1788,7 +1913,289 @@ function order_whatsapp_url(array $order): string {
     return whatsapp_url($msg);
 }
 
+/* ── Gestión de usuarios (clientes, empleados y administradores) ─────── */
+
+function user_email_exists(string $email, int $exceptId = 0): bool {
+    $st = db()->prepare('SELECT id FROM users WHERE email=? AND id<>? LIMIT 1');
+    $st->execute([$email, $exceptId]);
+    return (bool)$st->fetchColumn();
+}
+
+/** Crea un cliente mayorista. Devuelve el id. */
+function create_customer(array $d): int {
+    $name  = trim((string)($d['name'] ?? ''));
+    $email = mb_strtolower(trim((string)($d['email'] ?? '')));
+    $pass  = (string)($d['password'] ?? '');
+    if ($name === '' || $email === '' || $pass === '') throw new RuntimeException('Completá nombre, email y contraseña.');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('El email no es válido.');
+    if (strlen($pass) < 6) throw new RuntimeException('La contraseña debe tener al menos 6 caracteres.');
+    if (user_email_exists($email)) throw new RuntimeException('Ya existe un usuario con ese email.');
+    db()->prepare('INSERT INTO users (name,business,phone,email,password_hash,role,wholesale_approved) VALUES (?,?,?,?,?,?,?)')
+        ->execute([
+            $name,
+            trim((string)($d['business'] ?? '')),
+            trim((string)($d['phone'] ?? '')),
+            $email,
+            password_hash($pass, PASSWORD_DEFAULT),
+            'customer',
+            !empty($d['approved']) ? 1 : 0,
+        ]);
+    return (int)db()->lastInsertId();
+}
+
+function update_user_profile(int $id, array $d): void {
+    $name  = trim((string)($d['name'] ?? ''));
+    $email = mb_strtolower(trim((string)($d['email'] ?? '')));
+    if ($name === '' || $email === '') throw new RuntimeException('Nombre y email son obligatorios.');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('El email no es válido.');
+    if (user_email_exists($email, $id)) throw new RuntimeException('Ya existe otro usuario con ese email.');
+    db()->prepare('UPDATE users SET name=?, business=?, phone=?, email=? WHERE id=?')
+        ->execute([$name, trim((string)($d['business'] ?? '')), trim((string)($d['phone'] ?? '')), $email, $id]);
+}
+
+function set_user_password(int $id, string $pass): void {
+    if ($id < 1) throw new RuntimeException('Usuario inválido.');
+    if (strlen($pass) < 6) throw new RuntimeException('La contraseña debe tener al menos 6 caracteres.');
+    db()->prepare('UPDATE users SET password_hash=? WHERE id=?')
+        ->execute([password_hash($pass, PASSWORD_DEFAULT), $id]);
+}
+
+/** Elimina un usuario. Los pedidos asociados se eliminan en cascada. */
+function delete_user_account(int $id): void {
+    $me = (int)(current_user()['id'] ?? 0);
+    if ($id < 1) throw new RuntimeException('Usuario inválido.');
+    if ($id === $me) throw new RuntimeException('No podés eliminar tu propia cuenta.');
+    db()->prepare('DELETE FROM users WHERE id=?')->execute([$id]);
+}
+
+function user_orders_count(int $id): int {
+    $st = db()->prepare('SELECT COUNT(*) FROM orders WHERE user_id=?');
+    $st->execute([$id]);
+    return (int)$st->fetchColumn();
+}
+
+/** Crea un empleado o administrador del panel. */
+function create_staff_user(array $d): int {
+    $name  = trim((string)($d['name'] ?? ''));
+    $email = mb_strtolower(trim((string)($d['email'] ?? '')));
+    $pass  = (string)($d['password'] ?? '');
+    $role  = ((string)($d['role'] ?? 'employee')) === 'admin' ? 'admin' : 'employee';
+    if ($name === '' || $email === '' || $pass === '') throw new RuntimeException('Completá nombre, email y contraseña.');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('El email no es válido.');
+    if (strlen($pass) < 6) throw new RuntimeException('La contraseña debe tener al menos 6 caracteres.');
+    if (user_email_exists($email)) throw new RuntimeException('Ya existe un usuario con ese email.');
+    $perms = $role === 'employee'
+        ? implode(',', array_values(array_intersect((array)($d['perms'] ?? []), delegable_tabs())))
+        : '';
+    db()->prepare('INSERT INTO users (name,business,phone,email,password_hash,role,perms,wholesale_approved) VALUES (?,?,?,?,?,?,?,1)')
+        ->execute([$name, '', '', $email, password_hash($pass, PASSWORD_DEFAULT), $role, $perms]);
+    return (int)db()->lastInsertId();
+}
+
+function update_staff_user(int $id, array $d): void {
+    $st = db()->prepare('SELECT id,role FROM users WHERE id=? LIMIT 1');
+    $st->execute([$id]);
+    if (!$st->fetch()) throw new RuntimeException('Usuario no encontrado.');
+    $role = ((string)($d['role'] ?? 'employee')) === 'admin' ? 'admin' : 'employee';
+    $me   = (int)(current_user()['id'] ?? 0);
+    if ($id === $me && $role !== 'admin') throw new RuntimeException('No podés quitarte a vos mismo el rol de administrador.');
+    $perms = $role === 'employee'
+        ? implode(',', array_values(array_intersect((array)($d['perms'] ?? []), delegable_tabs())))
+        : '';
+    db()->prepare('UPDATE users SET role=?, perms=? WHERE id=?')->execute([$role, $perms, $id]);
+}
+
+/* ── Presupuestos manuales (tabla quotes) ────────────────────────────── */
+
+function quote_normalize_items(array $raw): array {
+    $out = [];
+    foreach ($raw as $it) {
+        $title = trim((string)($it['title'] ?? ''));
+        if ($title === '') continue;
+        $qty   = (float)str_replace(',', '.', (string)($it['qty'] ?? 1));
+        $price = (float)str_replace(',', '.', (string)($it['price'] ?? 0));
+        if ($qty <= 0) $qty = 1;
+        if ($price < 0) $price = 0;
+        $out[] = [
+            'title'  => $title,
+            'detail' => trim((string)($it['detail'] ?? '')),
+            'qty'    => round($qty, 2),
+            'price'  => round($price, 2),
+        ];
+    }
+    return $out;
+}
+
+function quote_total(array $items): float {
+    $t = 0.0;
+    foreach ($items as $it) $t += ((float)$it['qty']) * ((float)$it['price']);
+    return round($t, 2);
+}
+
+/** Formatea una cantidad sin decimales innecesarios: 2 -> "2", 1.5 -> "1,5". */
+function quote_fmt_qty(float $q): string {
+    $s = number_format($q, 2, ',', '.');
+    return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
+}
+
+function next_quote_number(): string {
+    $year = date('Y');
+    try {
+        $row = db()->query("SELECT number FROM quotes WHERE number LIKE 'PRE-$year-%' ORDER BY id DESC LIMIT 1")->fetchColumn();
+        $n = 1;
+        if ($row && preg_match('/-(\d+)$/', (string)$row, $m)) $n = (int)$m[1] + 1;
+        return sprintf('PRE-%s-%04d', $year, $n);
+    } catch (Throwable) {
+        return 'PRE-' . $year . '-' . sprintf('%04d', random_int(1, 9999));
+    }
+}
+
+/** Crea ($id=0) o actualiza un presupuesto. Devuelve el id. */
+function save_quote(array $data, int $id = 0): int {
+    if (!quotes_table_ready()) throw new RuntimeException('No se pudo preparar la tabla de presupuestos.');
+    $items = quote_normalize_items((array)($data['items'] ?? []));
+    if (!$items) throw new RuntimeException('Agregá al menos un artículo al presupuesto.');
+
+    $common = [
+        trim((string)($data['client_name'] ?? '')),
+        trim((string)($data['client_business'] ?? '')),
+        trim((string)($data['client_phone'] ?? '')),
+        trim((string)($data['client_email'] ?? '')),
+        trim((string)($data['client_address'] ?? '')),
+        json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        trim((string)($data['note'] ?? '')),
+        quote_total($items),
+        (string)($data['currency_symbol'] ?? '$'),
+        max(1, min(365, (int)($data['valid_days'] ?? 7))),
+    ];
+
+    if ($id > 0) {
+        $st = db()->prepare('UPDATE quotes SET client_name=?,client_business=?,client_phone=?,client_email=?,client_address=?,items_json=?,note=?,total=?,currency_symbol=?,valid_days=?,updated_at=NOW() WHERE id=?');
+        $st->execute([...$common, $id]);
+        return $id;
+    }
+
+    $st = db()->prepare('INSERT INTO quotes (client_name,client_business,client_phone,client_email,client_address,items_json,note,total,currency_symbol,valid_days,number,token,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    $st->execute([
+        ...$common,
+        next_quote_number(),
+        bin2hex(random_bytes(16)),
+        (int)(current_user()['id'] ?? 0),
+    ]);
+    return (int)db()->lastInsertId();
+}
+
+function quote_decode_items(?string $json): array {
+    $list = json_decode((string)$json, true);
+    if (!is_array($list)) return [];
+    $out = [];
+    foreach ($list as $it) {
+        if (!is_array($it)) continue;
+        $out[] = [
+            'title'  => (string)($it['title'] ?? ''),
+            'detail' => (string)($it['detail'] ?? ''),
+            'qty'    => (float)($it['qty'] ?? 1),
+            'price'  => (float)($it['price'] ?? 0),
+        ];
+    }
+    return $out;
+}
+
+function get_quotes(): array {
+    if (!quotes_table_ready()) return [];
+    try {
+        return db()->query('SELECT * FROM quotes ORDER BY id DESC')->fetchAll() ?: [];
+    } catch (Throwable) { return []; }
+}
+
+function get_quote_by_id(int $id): ?array {
+    if ($id < 1 || !quotes_table_ready()) return null;
+    try {
+        $st = db()->prepare('SELECT * FROM quotes WHERE id=? LIMIT 1');
+        $st->execute([$id]);
+        $row = $st->fetch();
+        return $row ?: null;
+    } catch (Throwable) { return null; }
+}
+
+function get_quote_by_token(string $token): ?array {
+    $token = trim($token);
+    if ($token === '' || !quotes_table_ready()) return null;
+    if (!preg_match('/^[a-f0-9]{32}$/', $token)) return null;
+    try {
+        $st = db()->prepare('SELECT * FROM quotes WHERE token=? LIMIT 1');
+        $st->execute([$token]);
+        $row = $st->fetch();
+        return $row ?: null;
+    } catch (Throwable) { return null; }
+}
+
+function delete_quote_by_id(int $id): void {
+    if ($id < 1) return;
+    db()->prepare('DELETE FROM quotes WHERE id=?')->execute([$id]);
+}
+
+/* ── Instagram (grilla administrable) ────────────────────────────────── */
+
+/** Guarda una imagen subida dentro de uploads/<subdir> y devuelve su URL pública. */
+function save_uploaded_image(array $file, string $subdir = 'general', int $maxMb = 8): string {
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) throw new RuntimeException('No se pudo recibir el archivo.');
+    if ((int)($file['size'] ?? 0) > $maxMb * 1024 * 1024) throw new RuntimeException('La imagen no debe superar los ' . $maxMb . ' MB.');
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file((string)$file['tmp_name']);
+    $exts = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+    if (!isset($exts[$mime])) throw new RuntimeException('Formato de imagen inválido. Usá JPG, PNG o WebP.');
+    $dir = __DIR__ . '/uploads/' . $subdir;
+    if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) throw new RuntimeException('No se pudo preparar la carpeta de imágenes.');
+    $name = $subdir . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $exts[$mime];
+    if (!move_uploaded_file((string)$file['tmp_name'], $dir . '/' . $name)) throw new RuntimeException('No se pudo guardar la imagen.');
+    return site_url('uploads/' . $subdir . '/' . $name);
+}
+
+function instagram_handle(): string {
+    $h = trim(setting('instagram_handle', ''));
+    return $h !== '' ? $h : '@ser.insumos';
+}
+
+function instagram_profile_url(): string {
+    $h = ltrim(instagram_handle(), '@');
+    return 'https://www.instagram.com/' . rawurlencode($h) . '/';
+}
+
+function instagram_posts(): array {
+    $list = json_decode(setting('instagram_posts', ''), true);
+    if (!is_array($list)) return [];
+    $out = [];
+    foreach ($list as $p) {
+        if (!is_array($p)) continue;
+        $img = trim((string)($p['image'] ?? ''));
+        if ($img === '') continue;
+        $out[] = [
+            'image'   => $img,
+            'link'    => trim((string)($p['link'] ?? '')),
+            'caption' => trim((string)($p['caption'] ?? '')),
+        ];
+    }
+    return $out;
+}
+
+function save_instagram_posts(array $posts): void {
+    $clean = [];
+    foreach ($posts as $p) {
+        if (!is_array($p)) continue;
+        $img = trim((string)($p['image'] ?? ''));
+        if ($img === '') continue;
+        $clean[] = [
+            'image'   => $img,
+            'link'    => trim((string)($p['link'] ?? '')),
+            'caption' => trim((string)($p['caption'] ?? '')),
+        ];
+    }
+    save_setting('instagram_posts', json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+}
+
 require_installation();
+ensure_extended_schema();
 check_maintenance_mode();
 
 

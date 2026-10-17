@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(50) NOT NULL DEFAULT '',
   email VARCHAR(190) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin','customer') NOT NULL DEFAULT 'customer',
+  role ENUM('admin','customer','employee') NOT NULL DEFAULT 'customer',
+  perms VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'Pestañas delegadas para el rol employee (CSV)',
   wholesale_approved TINYINT(1) NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -157,6 +158,29 @@ CREATE TABLE IF NOT EXISTS order_items (
   created_at         TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_oi_order (order_id),
   CONSTRAINT fk_oi_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Presupuestos armados a mano desde el panel (para clientes que no usan la web).
+-- El link público se comparte por WhatsApp o mail: presupuesto.php?t=<token>
+CREATE TABLE IF NOT EXISTS quotes (
+  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  number          VARCHAR(40)     NOT NULL,
+  token           VARCHAR(64)     NOT NULL,
+  client_name     VARCHAR(190)    NOT NULL DEFAULT '',
+  client_business VARCHAR(190)    NOT NULL DEFAULT '',
+  client_phone    VARCHAR(60)     NOT NULL DEFAULT '',
+  client_email    VARCHAR(190)    NOT NULL DEFAULT '',
+  client_address  VARCHAR(255)    NOT NULL DEFAULT '',
+  items_json      LONGTEXT        NOT NULL,
+  note            TEXT            NOT NULL,
+  total           DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
+  currency_symbol VARCHAR(10)     NOT NULL DEFAULT '$',
+  valid_days      INT             NOT NULL DEFAULT 7,
+  created_by      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP       NULL     DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_quotes_token  (token),
+  UNIQUE KEY uniq_quotes_number (number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

@@ -1,17 +1,57 @@
 <?php
 require_once __DIR__ . '/lib.php';
-require_admin();
+require_staff();
 
 /* ── Procesar POST ───────────────────────────────────────────────────── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $act = (string)($_POST['act'] ?? '');
     try {
+        /* Cada acción pertenece a una pestaña concreta. El permiso se valida
+           SIEMPRE acá, en el servidor: nunca se confía en el _tab del form. */
+        $ACTION_TABS = [
+            'toggle_user'          => 'clientes',
+            'create_client'        => 'clientes',
+            'update_user'          => 'clientes',
+            'set_user_password'    => 'clientes',
+            'delete_user'          => 'clientes',
+            'review_order_item'    => 'pedidos',
+            'confirm_order'        => 'pedidos',
+            'complete_order'       => 'pedidos',
+            'cancel_order'         => 'pedidos',
+            'save_override'        => 'productos',
+            'create_local_product' => 'productos',
+            'edit_local_product'   => 'productos',
+            'delete_local_product' => 'productos',
+            'delete_api_product'   => 'productos',
+            'restore_api_product'  => 'productos',
+            'sync_csv_catalog'     => 'productos',
+            'create_banner'        => 'banners',
+            'edit_banner'          => 'banners',
+            'delete_banner'        => 'banners',
+            'toggle_banner'        => 'banners',
+            'save_quote'           => 'presupuestos',
+            'delete_quote'         => 'presupuestos',
+            'save_whatsapp'        => 'configuracion',
+            'save_bank_settings'   => 'configuracion',
+            'save_site_logo'       => 'configuracion',
+            'save_site_favicon'    => 'configuracion',
+            'toggle_maintenance'   => 'configuracion',
+            'create_staff'         => 'configuracion',
+            'update_staff'         => 'configuracion',
+            'set_staff_password'   => 'configuracion',
+            'delete_staff'         => 'configuracion',
+            'save_instagram'       => 'configuracion',
+        ];
+        $requiredTab = $ACTION_TABS[(string)$act] ?? '';
+        if ($requiredTab !== '' && !can($requiredTab)) {
+            throw new RuntimeException('No tenés permisos para realizar esta acción.');
+        }
         if ($act === 'toggle_user') {
             $id       = (int)($_POST['user_id'] ?? 0);
             $current  = (int)($_POST['approved'] ?? 0);
             $approved = $current === 1 ? 0 : 1;
-            $st = db()->prepare("UPDATE users SET wholesale_approved=? WHERE id=? AND role<>'admin'");
+            $st = db()->prepare("UPDATE users SET wholesale_approved=? WHERE id=? AND role='customer'");
             $st->execute([$approved, $id]);
             set_flash('success', $approved ? 'Cliente aprobado.' : 'Se revocó el acceso mayorista.');
 
@@ -22,36 +62,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             save_setting('whatsapp', $number);
             set_flash('success', 'Número de WhatsApp guardado.');
-
-        } elseif ($act === 'create_document') {
-            $owner       = (int)($_POST['owner_id'] ?? 0);
-            $reference   = trim((string)($_POST['order_reference'] ?? ''));
-            $instructions = trim((string)($_POST['instructions'] ?? ''));
-            $check = db()->prepare("SELECT id FROM users WHERE id=? AND role<>'admin'");
-            $check->execute([$owner]);
-            if (!$check->fetchColumn() || $reference === '' || $instructions === '') {
-                throw new RuntimeException('Completá el cliente, la referencia y las instrucciones de pago.');
-            }
-            $st = db()->prepare('INSERT INTO payment_documents (owner_id,order_reference,instructions,enabled) VALUES (?,?,?,1)');
-            $st->execute([$owner, $reference, $instructions]);
-            set_flash('success', 'Se habilitó la carga del comprobante para ese pedido.');
-
-        } elseif ($act === 'edit_document') {
-            $id           = (int)($_POST['document_id'] ?? 0);
-            $reference    = trim((string)($_POST['order_reference'] ?? ''));
-            $instructions = trim((string)($_POST['instructions'] ?? ''));
-            if ($id < 1 || $reference === '' || $instructions === '') {
-                throw new RuntimeException('Completá la referencia y las instrucciones.');
-            }
-            $st = db()->prepare('UPDATE payment_documents SET order_reference=?,instructions=?,updated_at=NOW() WHERE id=?');
-            $st->execute([$reference, $instructions, $id]);
-            set_flash('success', 'Comprobante actualizado.');
-
-        } elseif ($act === 'toggle_document') {
-            $id = (int)($_POST['document_id'] ?? 0);
-            $st = db()->prepare('UPDATE payment_documents SET enabled=IF(enabled=1,0,1),updated_at=NOW() WHERE id=?');
-            $st->execute([$id]);
-            set_flash('success', 'Se actualizó el estado del comprobante.');
 
         } elseif ($act === 'save_override') {
             $handle = trim((string)($_POST['api_handle'] ?? ''));
@@ -356,6 +366,105 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ? '¡Modo mantenimiento ACTIVADO! La web ahora está pausada para el público y solo es visible para administradores.'
                 : '¡Modo mantenimiento DESACTIVADO! La web vuelve a estar abierta al público general.');
 
+        /* ── Clientes ────────────────────────────────────────────────── */
+        } elseif ($act === 'create_client') {
+            create_customer($_POST);
+            set_flash('success', 'Cliente creado correctamente. Ya puede ingresar con su email y contraseña.');
+
+        } elseif ($act === 'update_user') {
+            update_user_profile((int)($_POST['user_id'] ?? 0), $_POST);
+            set_flash('success', 'Datos del cliente actualizados.');
+
+        } elseif ($act === 'set_user_password') {
+            set_user_password((int)($_POST['user_id'] ?? 0), (string)($_POST['password'] ?? ''));
+            set_flash('success', 'Contraseña actualizada. Pasásela al cliente para que pueda ingresar.');
+
+        } elseif ($act === 'delete_user') {
+            $uid = (int)($_POST['user_id'] ?? 0);
+            $st = db()->prepare("SELECT id FROM users WHERE id=? AND role='customer'");
+            $st->execute([$uid]);
+            if (!$st->fetchColumn()) throw new RuntimeException('Solo se pueden eliminar clientes desde esta sección.');
+            delete_user_account($uid);
+            set_flash('success', 'Cliente eliminado definitivamente.');
+
+        /* ── Personal del panel (empleados y administradores) ────────── */
+        } elseif ($act === 'create_staff') {
+            create_staff_user($_POST);
+            set_flash('success', 'Usuario del panel creado. Ya puede ingresar con su email y contraseña.');
+
+        } elseif ($act === 'update_staff') {
+            update_staff_user((int)($_POST['user_id'] ?? 0), $_POST);
+            set_flash('success', 'Rol y permisos actualizados.');
+
+        } elseif ($act === 'set_staff_password') {
+            set_user_password((int)($_POST['user_id'] ?? 0), (string)($_POST['password'] ?? ''));
+            set_flash('success', 'Contraseña del usuario actualizada.');
+
+        } elseif ($act === 'delete_staff') {
+            $uid = (int)($_POST['user_id'] ?? 0);
+            $st = db()->prepare("SELECT id FROM users WHERE id=? AND role IN ('admin','employee')");
+            $st->execute([$uid]);
+            if (!$st->fetchColumn()) throw new RuntimeException('Usuario del panel no encontrado.');
+            delete_user_account($uid);
+            set_flash('success', 'Usuario del panel eliminado.');
+
+        /* ── Presupuestos ────────────────────────────────────────────── */
+        } elseif ($act === 'save_quote') {
+            $qid   = (int)($_POST['quote_id'] ?? 0);
+            $items = [];
+            foreach ((array)($_POST['item_title'] ?? []) as $i => $t) {
+                $items[] = [
+                    'title'  => $t,
+                    'detail' => (string)($_POST['item_detail'][$i] ?? ''),
+                    'qty'    => (string)($_POST['item_qty'][$i] ?? '1'),
+                    'price'  => (string)($_POST['item_price'][$i] ?? '0'),
+                ];
+            }
+            $savedId = save_quote([
+                'client_name'     => (string)($_POST['client_name'] ?? ''),
+                'client_business' => (string)($_POST['client_business'] ?? ''),
+                'client_phone'    => (string)($_POST['client_phone'] ?? ''),
+                'client_email'    => (string)($_POST['client_email'] ?? ''),
+                'client_address'  => (string)($_POST['client_address'] ?? ''),
+                'note'            => (string)($_POST['note'] ?? ''),
+                'valid_days'      => (int)($_POST['valid_days'] ?? 7),
+                'items'           => $items,
+            ], $qid);
+            set_flash('success', $qid > 0 ? 'Presupuesto actualizado.' : 'Presupuesto creado correctamente.');
+            redirect('admin.php?tab=presupuestos&ver=' . $savedId);
+
+        } elseif ($act === 'delete_quote') {
+            delete_quote_by_id((int)($_POST['quote_id'] ?? 0));
+            set_flash('success', 'Presupuesto eliminado.');
+
+        /* ── Instagram (portada) ─────────────────────────────────────── */
+        } elseif ($act === 'save_instagram') {
+            $images = (array)($_POST['ig_image'] ?? []);
+            $links  = (array)($_POST['ig_link'] ?? []);
+            $caps   = (array)($_POST['ig_caption'] ?? []);
+            $files  = $_FILES['ig_file'] ?? null;
+            $posts  = [];
+            $total  = max(count($images), 1);
+            for ($i = 0; $i < $total; $i++) {
+                $img = trim((string)($images[$i] ?? ''));
+                if ($files && is_array($files['tmp_name'] ?? null) && isset($files['tmp_name'][$i]) && (int)($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                    $img = save_uploaded_image([
+                        'tmp_name' => $files['tmp_name'][$i],
+                        'error'    => $files['error'][$i],
+                        'size'     => $files['size'][$i],
+                    ], 'instagram', 8);
+                }
+                if ($img === '') continue;
+                $posts[] = [
+                    'image'   => $img,
+                    'link'    => (string)($links[$i] ?? ''),
+                    'caption' => (string)($caps[$i] ?? ''),
+                ];
+            }
+            save_setting('instagram_handle', trim((string)($_POST['instagram_handle'] ?? '')));
+            save_instagram_posts($posts);
+            set_flash('success', 'Sección de Instagram actualizada.');
+
         } else {
             set_flash('error', 'Acción no reconocida.');
         }
@@ -373,35 +482,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect('admin.php?tab=' . urlencode($tab) . $extra);
 }
 
-/* ── Datos ───────────────────────────────────────────────────────────── */
-$users = db()->query(
-    "SELECT id,name,business,phone,email,role,wholesale_approved,created_at
-       FROM users WHERE role<>'admin' ORDER BY created_at DESC"
-)->fetchAll();
+/* ── Pestaña activa (solo las permitidas al usuario) ─────────────────── */
+$tab = (string)($_GET['tab'] ?? '');
+if ($tab === '' || !in_array($tab, panel_tabs(), true) || !can($tab)) {
+    $tab = '';
+    foreach (panel_tabs() as $t) { if (can($t)) { $tab = $t; break; } }
+}
 
-$docs = db()->query(
-    'SELECT d.*,u.name,u.business,u.email
-       FROM payment_documents d
-       JOIN users u ON u.id=d.owner_id
-      ORDER BY d.created_at DESC'
-)->fetchAll();
+/* ── Datos ───────────────────────────────────────────────────────────── */
+$users = can('clientes')
+    ? db()->query(
+        "SELECT id,name,business,phone,email,role,wholesale_approved,created_at
+           FROM users WHERE role='customer' ORDER BY created_at DESC"
+      )->fetchAll()
+    : [];
+
+/* Personal del panel (empleados y administradores) */
+$staffUsers = can('configuracion')
+    ? db()->query("SELECT id,name,email,role,perms,created_at FROM users WHERE role IN ('admin','employee') ORDER BY (role='admin') DESC, name")->fetchAll()
+    : [];
+
+/* Presupuestos */
+$quotesList  = can('presupuestos') ? get_quotes() : [];
+$quotesTotal = count($quotesList);
 
 /* Estadísticas rápidas */
-$total_clientes       = count($users);
-$pendientes           = count(array_filter($users, fn($u) => (int)$u['wholesale_approved'] === 0));
-$aprobados            = $total_clientes - $pendientes;
-$docs_activos         = count(array_filter($docs, fn($d) => (int)$d['enabled'] === 1));
-$docs_con_comprobante = count(array_filter($docs, fn($d) => !empty($d['receipt_path'])));
+$total_clientes = count($users);
+$pendientes     = count(array_filter($users, fn($u) => (int)$u['wholesale_approved'] === 0));
+$aprobados      = $total_clientes - $pendientes;
 
-$allAdminOrders     = get_orders();
+$allAdminOrders     = can('pedidos') ? get_orders() : [];
 $orders_pendientes  = count(array_filter($allAdminOrders, fn($o) => $o['status'] === 'pending_review'));
 $orders_confirmados = count(array_filter($allAdminOrders, fn($o) => $o['status'] === 'confirmed'));
 $orders_pagados     = count(array_filter($allAdminOrders, fn($o) => $o['status'] === 'payment_uploaded'));
-
-/* Pestaña activa */
-$tab = in_array((string)($_GET['tab'] ?? ''), ['clientes', 'pedidos', 'productos', 'banners', 'comprobantes', 'configuracion'])
-    ? (string)$_GET['tab']
-    : 'clientes';
 
 $bankSettings = get_bank_details();
 
@@ -421,7 +534,7 @@ if ($tab === 'banners') {
 }
 
 
-site_header('Administración', 'Administración de clientes mayoristas, WhatsApp y comprobantes de Serinsumos.');
+site_header('Administración', 'Panel de gestión de Serinsumos: clientes, pedidos, presupuestos, productos y configuración.');
 ?>
 
 <style>
@@ -542,6 +655,49 @@ input:checked ~ .confirm-revoke { display:inline; }
     .or-total { text-align: left; }
 }
 
+/* ── Formularios en grilla (global) ─────────────────────────────────── */
+.prod-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
+.prod-edit-grid label { margin-bottom: 0; }
+.prod-edit-grid label input, .prod-edit-grid label select, .prod-edit-grid label textarea { width: 100%; }
+@media(max-width:700px) { .prod-edit-grid { grid-template-columns: 1fr; } }
+
+/* ── Paneles desplegables y cajas ───────────────────────────────────── */
+.panel-toggle { margin: 0; }
+.panel-toggle > summary { list-style: none; cursor: pointer; }
+.panel-toggle > summary::-webkit-details-marker { display: none; }
+.panel-toggle-body { margin-top: 18px; background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 22px; max-width: 880px; }
+.panel-box { background: #f8fafc; border: 1px solid var(--line); border-left: 4px solid var(--blue); border-radius: 12px; padding: 20px 22px; }
+
+/* ── Tarjeta de cliente ─────────────────────────────────────────────── */
+.client-card { flex-direction: column; align-items: stretch; gap: 16px; }
+.client-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.client-tools { display: flex; gap: 12px; flex-wrap: wrap; border-top: 1px dashed var(--line); padding-top: 16px; }
+.client-tools details > summary { list-style: none; cursor: pointer; }
+.client-tools details > summary::-webkit-details-marker { display: none; }
+.client-tool-form { margin-top: 16px; background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 20px; max-width: 780px; }
+
+/* ── Constructor de presupuestos ────────────────────────────────────── */
+.quote-head, .quote-row {
+    display: grid;
+    grid-template-columns: 2.2fr 1.7fr 78px 120px 36px;
+    gap: 10px;
+    align-items: center;
+}
+.quote-head { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--gray); font-weight: 700; padding: 0 4px 6px; }
+.quote-row { margin-bottom: 10px; }
+.quote-row input { margin: 0; }
+.quote-del { border: 1px solid var(--line); background: #fff; color: var(--pink); border-radius: 8px; height: 44px; font-size: 18px; line-height: 1; cursor: pointer; }
+.quote-del:hover { background: #fff4f8; }
+.quote-actions { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.quote-total { font-size: 13px; color: var(--gray); letter-spacing: .5px; }
+.quote-total b { font-family: Rubik, sans-serif; font-size: 20px; color: var(--ink); margin-left: 8px; }
+@media(max-width: 780px) {
+    .quote-head { display: none; }
+    .quote-row { grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; }
+    .quote-row input[name="item_title[]"], .quote-row input[name="item_detail[]"] { grid-column: 1 / -1; }
+    .quote-del { grid-column: 1 / -1; width: 100%; height: 36px; }
+}
+
 @media(max-width: 700px) {
     .admin-stats { grid-template-columns: 1fr 1fr; }
 }
@@ -569,40 +725,59 @@ input:checked ~ .confirm-revoke { display:inline; }
                 <?= csrf_field() ?>
                 <input type="hidden" name="act" value="toggle_maintenance">
                 <input type="hidden" name="_tab" value="<?= e($tab) ?>">
+                <?php if (can('configuracion')): ?>
                 <button class="btn btn-small" type="submit" style="background:#16a34a;color:#fff;border:none;font-weight:700;padding:8px 16px;border-radius:6px;cursor:pointer">✓ Desactivar y abrir sitio</button>
+                <?php else: ?>
+                <span style="font-size:12px;color:#991b1b;font-weight:600">Pedile a un administrador que lo desactive.</span>
+                <?php endif; ?>
             </form>
         </div>
     <?php endif; ?>
 
     <!-- Estadísticas rápidas -->
-    <div class="admin-stats">
+    <div class="admin-stats" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+        <?php if (can('clientes')): ?>
         <div class="admin-stat">
             <div class="admin-stat-num"><?= $total_clientes ?></div>
             <div class="admin-stat-label">Clientes registrados</div>
         </div>
+        <?php endif; ?>
+        <?php if (can('pedidos')): ?>
         <div class="admin-stat yellow">
             <div class="admin-stat-num"><?= $orders_pendientes ?></div>
             <div class="admin-stat-label">Pedidos a confirmar</div>
         </div>
         <div class="admin-stat green">
             <div class="admin-stat-num"><?= $orders_pagados ?></div>
-            <div class="admin-stat-label">Comprobantes a revisar</div>
+            <div class="admin-stat-label">Pagos por verificar</div>
         </div>
+        <?php endif; ?>
+        <?php if (can('presupuestos')): ?>
+        <div class="admin-stat">
+            <div class="admin-stat-num"><?= $quotesTotal ?></div>
+            <div class="admin-stat-label">Presupuestos creados</div>
+        </div>
+        <?php endif; ?>
+        <?php if (can('clientes')): ?>
         <div class="admin-stat pink">
             <div class="admin-stat-num"><?= $pendientes ?></div>
             <div class="admin-stat-label">Clientes por aprobar</div>
         </div>
+        <?php endif; ?>
     </div>
 
     <!-- Pestañas -->
     <nav class="admin-tabs" aria-label="Secciones del panel">
-        <a href="admin.php?tab=clientes"       class="<?= $tab === 'clientes'       ? 'active' : '' ?>">
+        <?php if (can('clientes')): ?>
+        <a href="admin.php?tab=clientes" class="<?= $tab === 'clientes' ? 'active' : '' ?>">
             👥 Clientes
             <?php if ($pendientes > 0): ?>
                 <span class="badge badge-yellow" style="margin-left:6px"><?= $pendientes ?></span>
             <?php endif; ?>
         </a>
-        <a href="admin.php?tab=pedidos"        class="<?= $tab === 'pedidos'        ? 'active' : '' ?>">
+        <?php endif; ?>
+        <?php if (can('pedidos')): ?>
+        <a href="admin.php?tab=pedidos" class="<?= $tab === 'pedidos' ? 'active' : '' ?>">
             🛒 Pedidos
             <?php if ($orders_pendientes > 0): ?>
                 <span class="badge badge-yellow" style="margin-left:6px"><?= $orders_pendientes ?></span>
@@ -610,24 +785,33 @@ input:checked ~ .confirm-revoke { display:inline; }
                 <span class="badge badge-blue" style="margin-left:6px"><?= $orders_pagados ?></span>
             <?php endif; ?>
         </a>
-        <a href="admin.php?tab=productos"      class="<?= $tab === 'productos'      ? 'active' : '' ?>">
+        <?php endif; ?>
+        <?php if (can('productos')): ?>
+        <a href="admin.php?tab=productos" class="<?= $tab === 'productos' ? 'active' : '' ?>">
             📦 Productos
         </a>
-        <a href="admin.php?tab=banners"        class="<?= $tab === 'banners'        ? 'active' : '' ?>">
-            🖼️ Banners
-        </a>
-        <a href="admin.php?tab=comprobantes"   class="<?= $tab === 'comprobantes'   ? 'active' : '' ?>">
-            📄 Comprobantes
-            <?php if ($docs_con_comprobante > 0): ?>
-                <span class="badge badge-blue" style="margin-left:6px"><?= $docs_con_comprobante ?></span>
+        <?php endif; ?>
+        <?php if (can('presupuestos')): ?>
+        <a href="admin.php?tab=presupuestos" class="<?= $tab === 'presupuestos' ? 'active' : '' ?>">
+            📝 Presupuestos
+            <?php if ($quotesTotal > 0): ?>
+                <span class="badge badge-gray" style="margin-left:6px"><?= $quotesTotal ?></span>
             <?php endif; ?>
         </a>
-        <a href="admin.php?tab=configuracion"  class="<?= $tab === 'configuracion'  ? 'active' : '' ?>">
+        <?php endif; ?>
+        <?php if (can('banners')): ?>
+        <a href="admin.php?tab=banners" class="<?= $tab === 'banners' ? 'active' : '' ?>">
+            🖼️ Banners
+        </a>
+        <?php endif; ?>
+        <?php if (can('configuracion')): ?>
+        <a href="admin.php?tab=configuracion" class="<?= $tab === 'configuracion' ? 'active' : '' ?>">
             ⚙️ Configuración
             <?php if (setting('maintenance_mode', '0') === '1'): ?>
                 <span class="badge" style="margin-left:6px;background:#ef4444;color:#fff;font-weight:700">Mantenimiento ON</span>
             <?php endif; ?>
         </a>
+        <?php endif; ?>
     </nav>
 
 
@@ -637,8 +821,42 @@ input:checked ~ .confirm-revoke { display:inline; }
     ═══════════════════════════════════════════════════════════════════ -->
     <?php if ($tab === 'clientes'): ?>
 
-        <h2>Clientes mayoristas</h2>
-        <p>Aprobá o revocá el acceso mayorista a los clientes registrados. Los pendientes aparecen primero.</p>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px">
+            <div>
+                <h2 style="margin:0">Clientes mayoristas</h2>
+                <p style="margin:4px 0 0">Aprobá, editá o eliminá clientes y gestioná su contraseña de acceso. Los pendientes aparecen primero.</p>
+            </div>
+            <details class="panel-toggle">
+                <summary class="btn yellow" style="margin:0">＋ Nuevo cliente</summary>
+                <form method="post" class="panel-toggle-body">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="act"   value="create_client">
+                    <input type="hidden" name="_tab"  value="clientes">
+                    <div class="prod-edit-grid">
+                        <label>Nombre y apellido *
+                            <input name="name" required placeholder="Ej: Juan Pérez">
+                        </label>
+                        <label>Nombre del negocio
+                            <input name="business" placeholder="Ej: Estampa Tu Mundo">
+                        </label>
+                        <label>Teléfono / WhatsApp
+                            <input name="phone" inputmode="tel" placeholder="Ej: 3511234567">
+                        </label>
+                        <label>Email *
+                            <input name="email" type="email" required placeholder="cliente@correo.com">
+                        </label>
+                        <label>Contraseña inicial *
+                            <input name="password" minlength="6" required placeholder="Mínimo 6 caracteres">
+                        </label>
+                    </div>
+                    <label style="display:flex;flex-direction:row;align-items:center;gap:9px;margin-top:14px;font-size:14px">
+                        <input type="checkbox" name="approved" value="1" checked>
+                        Aprobar el acceso mayorista desde el inicio
+                    </label>
+                    <button class="btn yellow" type="submit" style="margin-top:16px">Crear cliente</button>
+                </form>
+            </details>
+        </div>
 
         <?php
         // Mostrar pendientes primero
@@ -646,59 +864,105 @@ input:checked ~ .confirm-revoke { display:inline; }
         ?>
 
         <?php if (!$users): ?>
-            <p>No hay clientes registrados.</p>
+            <div class="access-box"><p style="margin:0">No hay clientes registrados todavía.</p></div>
         <?php else: foreach ($users as $u): ?>
 
             <?php
-            $isApproved = (int)$u['wholesale_approved'] === 1;
+            $isApproved  = (int)$u['wholesale_approved'] === 1;
             $displayName = e($u['business'] ?: $u['name']);
+            $uOrders     = user_orders_count((int)$u['id']);
             ?>
-            <div class="admin-row">
-                <div class="admin-row-info">
-                    <b><?= $displayName ?></b>
-                    <p><?= e($u['email']) ?> · <?= e($u['phone']) ?></p>
-                    <div class="admin-row-meta" style="margin-top:6px;gap:8px">
-                        <?php if ($isApproved): ?>
-                            <span class="badge badge-green">✓ Aprobado</span>
-                        <?php else: ?>
-                            <span class="badge badge-yellow">⏳ Pendiente</span>
-                        <?php endif; ?>
-                        <small>Registrado el <?= e(date('d/m/Y', strtotime($u['created_at']))) ?></small>
+            <div class="admin-row client-card">
+                <div class="client-card-head">
+                    <div class="admin-row-info">
+                        <b><?= $displayName ?></b>
+                        <p><?= e($u['name']) ?><?php if ($u['business']): ?> · <?= e($u['business']) ?><?php endif; ?></p>
+                        <p><?= e($u['email']) ?><?= $u['phone'] !== '' ? ' · ' . e($u['phone']) : '' ?></p>
+                        <div class="admin-row-meta" style="margin-top:6px;gap:8px">
+                            <?php if ($isApproved): ?>
+                                <span class="badge badge-green">✓ Aprobado</span>
+                            <?php else: ?>
+                                <span class="badge badge-yellow">⏳ Pendiente</span>
+                            <?php endif; ?>
+                            <span class="badge badge-gray"><?= $uOrders ?> pedido<?= $uOrders === 1 ? '' : 's' ?></span>
+                            <small>Registrado el <?= e(date('d/m/Y', strtotime($u['created_at']))) ?></small>
+                        </div>
                     </div>
-                </div>
 
-                <div class="admin-row-actions">
-                    <?php if ($isApproved): ?>
-                        <!-- Revocar con confirmación vía JS -->
-                        <form method="post"
-                              onsubmit="return confirm('¿Seguro que querés revocar el acceso mayorista a <?= addslashes($displayName) ?>?')">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="act"      value="toggle_user">
-                            <input type="hidden" name="_tab"     value="clientes">
-                            <input type="hidden" name="user_id"  value="<?= (int)$u['id'] ?>">
-                            <input type="hidden" name="approved" value="<?= (int)$u['wholesale_approved'] ?>">
-                            <button class="btn outline" type="submit" style="color:var(--pink);border-color:var(--pink)">
-                                Revocar acceso
-                            </button>
-                        </form>
-                    <?php else: ?>
+                    <div class="admin-row-actions">
                         <form method="post">
                             <?= csrf_field() ?>
                             <input type="hidden" name="act"      value="toggle_user">
                             <input type="hidden" name="_tab"     value="clientes">
                             <input type="hidden" name="user_id"  value="<?= (int)$u['id'] ?>">
                             <input type="hidden" name="approved" value="<?= (int)$u['wholesale_approved'] ?>">
-                            <button class="btn yellow" type="submit">Aprobar cliente</button>
+                            <?php if ($isApproved): ?>
+                                <button class="btn outline btn-small" type="submit" style="color:var(--pink);border-color:var(--pink)">Revocar acceso</button>
+                            <?php else: ?>
+                                <button class="btn yellow btn-small" type="submit">Aprobar cliente</button>
+                            <?php endif; ?>
                         </form>
-                    <?php endif; ?>
+
+                        <form method="post" onsubmit="return confirm('¿Eliminar definitivamente a <?= addslashes($displayName) ?>?\n\nSe borrarán también sus <?= $uOrders ?> pedido(s) y no se puede deshacer.')">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="act"     value="delete_user">
+                            <input type="hidden" name="_tab"    value="clientes">
+                            <input type="hidden" name="user_id" value="<?= (int)$u['id'] ?>">
+                            <button class="btn outline btn-small" type="submit" style="color:var(--pink);border-color:var(--pink)">🗑 Eliminar</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="client-tools">
+                    <details>
+                        <summary class="btn outline btn-small">✎ Editar datos</summary>
+                        <form method="post" class="client-tool-form">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="act"     value="update_user">
+                            <input type="hidden" name="_tab"    value="clientes">
+                            <input type="hidden" name="user_id" value="<?= (int)$u['id'] ?>">
+                            <div class="prod-edit-grid">
+                                <label>Nombre y apellido
+                                    <input name="name" required value="<?= e($u['name']) ?>">
+                                </label>
+                                <label>Nombre del negocio
+                                    <input name="business" value="<?= e($u['business']) ?>">
+                                </label>
+                                <label>Teléfono / WhatsApp
+                                    <input name="phone" value="<?= e($u['phone']) ?>">
+                                </label>
+                                <label>Email
+                                    <input name="email" type="email" required value="<?= e($u['email']) ?>">
+                                </label>
+                            </div>
+                            <button class="btn yellow btn-small" type="submit" style="margin-top:14px">Guardar cambios</button>
+                        </form>
+                    </details>
+
+                    <details>
+                        <summary class="btn outline btn-small">🔑 Cambiar contraseña</summary>
+                        <form method="post" class="client-tool-form">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="act"     value="set_user_password">
+                            <input type="hidden" name="_tab"    value="clientes">
+                            <input type="hidden" name="user_id" value="<?= (int)$u['id'] ?>">
+                            <label>Nueva contraseña
+                                <input name="password" minlength="6" required placeholder="Mínimo 6 caracteres">
+                            </label>
+                            <small style="display:block;color:var(--gray);font-size:12px;margin-top:8px">
+                                Pasásela al cliente para que ingrese con su email. Puede cambiarla luego desde "Recuperar contraseña".
+                            </small>
+                            <button class="btn yellow btn-small" type="submit" style="margin-top:12px">Guardar contraseña</button>
+                        </form>
+                    </details>
                 </div>
             </div>
 
         <?php endforeach; endif; ?>
 
         <div style="margin-top:28px">
-            <a class="btn yellow" href="https://ecommerce.hostinger.com/" target="_blank" rel="noopener noreferrer">
-                Gestionar productos y pedidos ↗
+            <a class="btn outline" href="https://ecommerce.hostinger.com/" target="_blank" rel="noopener noreferrer">
+                Gestionar catálogo en la tienda de Hostinger ↗
             </a>
         </div>
 
@@ -2069,142 +2333,421 @@ input:checked ~ .confirm-revoke { display:inline; }
         </script>
 
     <!-- ══════════════════════════════════════════════════════════════════
-         PESTAÑA: COMPROBANTES
+         PESTAÑA: PRESUPUESTOS
     ═══════════════════════════════════════════════════════════════════ -->
-    <?php elseif ($tab === 'comprobantes'): ?>
+    <?php elseif ($tab === 'presupuestos'): ?>
 
+        <?php
+        $verRaw       = trim((string)($_GET['ver'] ?? ''));
+        $newQuote     = !empty($_GET['nuevo']) || $verRaw === 'nuevo';
+        $currentQuote = ($verRaw !== '' && ctype_digit($verRaw)) ? get_quote_by_id((int)$verRaw) : null;
+        $editing      = $newQuote || $currentQuote !== null;
+        $quoteItems   = $currentQuote ? quote_decode_items((string)$currentQuote['items_json']) : [];
+        if (!$quoteItems) $quoteItems[] = ['title' => '', 'detail' => '', 'qty' => 1, 'price' => 0];
+        $quotePublic  = $currentQuote ? site_url('presupuesto.php?t=' . $currentQuote['token']) : '';
+        $quoteBackUrl = 'admin.php?tab=presupuestos';
+        ?>
 
+        <?php if (!$editing): ?>
 
-        <h2>Habilitar comprobante de pago</h2>
-        <p>Después de revisar el pedido, ingresá su referencia y las instrucciones con el importe final, el stock confirmado y los datos para transferir.</p>
-
-        <form method="post">
-            <?= csrf_field() ?>
-            <input type="hidden" name="act"  value="create_document">
-            <input type="hidden" name="_tab" value="comprobantes">
-
-            <label>Cliente
-                <select name="owner_id" required>
-                    <option value="">Seleccionar cliente</option>
-                    <?php foreach ($users as $u): ?>
-                        <option value="<?= (int)$u['id'] ?>">
-                            <?= e(($u['business'] ?: $u['name']) . ' · ' . $u['email']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-
-            <label>Referencia del pedido
-                <input name="order_reference" required placeholder="Ej: PED-2024-001">
-            </label>
-
-            <label>Stock confirmado, importe y datos de transferencia
-                <textarea name="instructions" required placeholder="Detallá los artículos confirmados, el total a pagar y los datos bancarios para la transferencia."></textarea>
-            </label>
-
-            <button class="btn yellow" type="submit">Habilitar carga de comprobante</button>
-        </form>
-
-        <h2 style="margin-top:40px">Comprobantes solicitados</h2>
-
-        <?php if (!$docs): ?>
-            <p>No hay solicitudes de comprobantes.</p>
-        <?php else: foreach ($docs as $d): ?>
-
-            <?php
-            $docEnabled      = (int)$d['enabled'] === 1;
-            $hasReceipt      = !empty($d['receipt_path']);
-            $docDisplayName  = e($d['business'] ?: $d['name']);
-            $docId           = (int)$d['id'];
-            ?>
-            <div class="admin-row" style="flex-direction:column; align-items:stretch">
-
-                <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap">
-                    <div class="admin-row-info" style="flex:1">
-                        <b><?= e($d['order_reference']) ?></b>
-                        <p><?= $docDisplayName ?> · <?= e($d['email']) ?></p>
-                        <p style="white-space:pre-wrap; margin-top:6px"><?= nl2br(e($d['instructions'])) ?></p>
-
-                        <div class="admin-row-meta" style="margin-top:8px; gap:8px">
-                            <?php if ($hasReceipt): ?>
-                                <span class="badge badge-green">✓ Comprobante recibido</span>
-                            <?php else: ?>
-                                <span class="badge badge-gray">Sin comprobante</span>
-                            <?php endif; ?>
-
-                            <?php if ($docEnabled): ?>
-                                <span class="badge badge-blue">Carga habilitada</span>
-                            <?php else: ?>
-                                <span class="badge badge-pink">Carga cerrada</span>
-                            <?php endif; ?>
-
-                            <small><?= e(date('d/m/Y', strtotime($d['created_at']))) ?></small>
-                        </div>
-
-                        <?php if ($hasReceipt): ?>
-                            <p style="margin-top:8px">
-                                <a href="<?= e(site_url('ver-comprobante.php?id=' . $docId)) ?>"
-                                   target="_blank" rel="noopener"
-                                   style="color:var(--blue); font-size:13px">
-                                    Ver archivo ↗
-                                </a>
-                            </p>
-                        <?php endif; ?>
-                    </div>
-
-                    <div class="admin-row-actions" style="flex-direction:column; align-items:flex-end; gap:8px">
-                        <!-- Toggle habilitado/cerrado -->
-                        <form method="post">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="act"         value="toggle_document">
-                            <input type="hidden" name="_tab"        value="comprobantes">
-                            <input type="hidden" name="document_id" value="<?= $docId ?>">
-                            <button class="btn outline btn-small" type="submit">
-                                <?= $docEnabled ? 'Cerrar carga' : 'Habilitar carga' ?>
-                            </button>
-                        </form>
-
-                        <!-- Botón editar -->
-                        <button class="btn outline btn-small"
-                                onclick="document.getElementById('edit-<?= $docId ?>').classList.toggle('open')"
-                                type="button">
-                            Editar instrucciones
-                        </button>
-                    </div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px">
+                <div>
+                    <h2 style="margin:0">Presupuestos</h2>
+                    <p style="margin:4px 0 0">Armá un presupuesto para alguien que no usa la web: cargás los artículos y precios, lo guardás y le enviás el PDF o un link público.</p>
                 </div>
-
-                <!-- Formulario editar (inline, oculto por defecto) -->
-                <div class="edit-doc-form" id="edit-<?= $docId ?>">
-                    <form method="post">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="act"         value="edit_document">
-                        <input type="hidden" name="_tab"        value="comprobantes">
-                        <input type="hidden" name="document_id" value="<?= $docId ?>">
-
-                        <label>Referencia del pedido
-                            <input name="order_reference" required value="<?= e($d['order_reference']) ?>">
-                        </label>
-                        <label>Instrucciones de pago
-                            <textarea name="instructions" required><?= e($d['instructions']) ?></textarea>
-                        </label>
-                        <div class="btn-row">
-                            <button class="btn yellow btn-small" type="submit">Guardar cambios</button>
-                            <button class="btn outline btn-small" type="button"
-                                    onclick="document.getElementById('edit-<?= $docId ?>').classList.remove('open')">
-                                Cancelar
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
+                <a class="btn yellow" href="admin.php?tab=presupuestos&amp;nuevo=1" style="margin:0">＋ Nuevo presupuesto</a>
             </div>
 
-        <?php endforeach; endif; ?>
+            <?php if (!$quotesList): ?>
+                <div class="access-box"><p style="margin:0">Todavía no hay presupuestos guardados. Creá el primero con <b>＋ Nuevo presupuesto</b>.</p></div>
+            <?php else: ?>
+                <div class="orders-list">
+                    <?php foreach ($quotesList as $q):
+                        $qId     = (int)$q['id'];
+                        $qItems  = quote_decode_items((string)$q['items_json']);
+                        $qClient = trim((string)$q['client_business']) !== '' ? $q['client_business'] : ((string)$q['client_name'] ?: 'Sin nombre');
+                    ?>
+                    <div class="order-row" style="border-left-color:var(--blue)">
+                        <div class="or-main">
+                            <div class="or-top">
+                                <span class="or-num"><?= e($q['number']) ?></span>
+                                <span class="badge badge-gray"><?= count($qItems) ?> artículo<?= count($qItems) === 1 ? '' : 's' ?></span>
+                            </div>
+                            <div class="or-sub">
+                                <span>👤 <b><?= e($qClient) ?></b></span>
+                                <?php if (trim((string)$q['client_phone']) !== ''): ?>
+                                    <span>·</span><span><?= e($q['client_phone']) ?></span>
+                                <?php endif; ?>
+                                <span>·</span>
+                                <span><?= e(date('d/m/Y H:i', strtotime((string)$q['created_at']))) ?></span>
+                            </div>
+                        </div>
+                        <div class="or-right">
+                            <div class="or-total">
+                                <?= e($q['currency_symbol'] ?: '$') ?><?= number_format((float)$q['total'], 2, ',', '.') ?>
+                                <small>Presupuesto</small>
+                            </div>
+                            <a class="btn outline btn-small" href="presupuesto-pdf.php?id=<?= $qId ?>" target="_blank" rel="noopener" style="margin:0">PDF ↗</a>
+                            <a class="btn yellow btn-small" href="admin.php?tab=presupuestos&amp;ver=<?= $qId ?>" style="margin:0">Gestionar →</a>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="system-note" style="margin-top:34px;border-radius:8px">
+                <b>¿Dónde quedaron los comprobantes de pago?</b>
+                <p style="margin:8px 0 0;color:var(--gray);font-size:14px">
+                    Ahora se gestionan desde el propio pedido (<b>Pedidos → Gestionar</b>), que además permite generar el
+                    resumen en PDF para reenviarle al cliente.
+                </p>
+            </div>
+
+        <?php else: ?>
+
+            <a href="<?= e($quoteBackUrl) ?>" class="btn outline btn-small" style="margin:0 0 16px">← Volver a los presupuestos</a>
+            <h2 style="margin:0"><?= $currentQuote ? 'Presupuesto ' . e($currentQuote['number']) : 'Nuevo presupuesto' ?></h2>
+            <p style="margin:4px 0 22px">Cargá los datos y los artículos. Al guardar vas a poder descargar el PDF o copiar el link público para enviarlo.</p>
+
+            <?php if ($currentQuote): ?>
+            <div class="panel-box" style="margin-bottom:26px">
+                <b>Enviar al cliente</b>
+                <p style="margin:6px 0 14px;font-size:13px;color:var(--gray)">Elegí el estado para el PDF, o compartí el link público (se abre directamente el documento).</p>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+                    <a class="btn outline btn-small" href="presupuesto-pdf.php?id=<?= (int)$currentQuote['id'] ?>&amp;estado=presupuesto" target="_blank" rel="noopener">PDF · Presupuesto ↗</a>
+                    <a class="btn outline btn-small" href="presupuesto-pdf.php?id=<?= (int)$currentQuote['id'] ?>&amp;estado=pendiente" target="_blank" rel="noopener">PDF · Pendiente de pago ↗</a>
+                    <a class="btn outline btn-small" href="presupuesto-pdf.php?id=<?= (int)$currentQuote['id'] ?>&amp;estado=pagado" target="_blank" rel="noopener">PDF · Pagado ↗</a>
+                </div>
+                <label style="font-size:13px;font-weight:600">Link público para compartir
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+                        <input id="quote-public-url" readonly value="<?= e($quotePublic) ?>" style="flex:1;min-width:220px">
+                        <button type="button" class="btn outline btn-small" onclick="copyQuoteUrl(this)">Copiar link</button>
+                        <a class="btn outline btn-small" href="<?= e($quotePublic) ?>" target="_blank" rel="noopener noreferrer">Abrir ↗</a>
+                    </div>
+                </label>
+            </div>
+            <?php endif; ?>
+
+            <form method="post" id="quote-form">
+                <?= csrf_field() ?>
+                <input type="hidden" name="act"      value="save_quote">
+                <input type="hidden" name="_tab"     value="presupuestos">
+                <input type="hidden" name="quote_id" value="<?= $currentQuote ? (int)$currentQuote['id'] : 0 ?>">
+
+                <h3 style="margin:0 0 14px">Datos del cliente</h3>
+                <div class="prod-edit-grid">
+                    <label>Cliente / Contacto *
+                        <input name="client_name" required value="<?= e($currentQuote['client_name'] ?? '') ?>" placeholder="Ej: María Gómez">
+                    </label>
+                    <label>Negocio / Empresa
+                        <input name="client_business" value="<?= e($currentQuote['client_business'] ?? '') ?>" placeholder="Ej: Taller Color">
+                    </label>
+                    <label>Teléfono / WhatsApp
+                        <input name="client_phone" value="<?= e($currentQuote['client_phone'] ?? '') ?>" placeholder="Ej: 3511234567">
+                    </label>
+                    <label>Email
+                        <input name="client_email" type="email" value="<?= e($currentQuote['client_email'] ?? '') ?>" placeholder="cliente@correo.com">
+                    </label>
+                    <label>Dirección / Localidad
+                        <input name="client_address" value="<?= e($currentQuote['client_address'] ?? '') ?>" placeholder="Ej: Córdoba Capital">
+                    </label>
+                </div>
+
+                <h3 style="margin:28px 0 14px">Artículos</h3>
+                <div class="quote-head" aria-hidden="true">
+                    <span>Producto / servicio</span>
+                    <span>Detalle</span>
+                    <span>Cant.</span>
+                    <span>Precio unit.</span>
+                    <span></span>
+                </div>
+                <div id="quote-rows">
+                    <?php foreach ($quoteItems as $it): ?>
+                    <div class="quote-row">
+                        <input name="item_title[]"  value="<?= e($it['title']) ?>"  placeholder="Nombre del producto" required>
+                        <input name="item_detail[]" value="<?= e($it['detail']) ?>" placeholder="Opcional">
+                        <input name="item_qty[]"    type="number" step="0.01" min="0.01" value="<?= e(quote_fmt_qty((float)$it['qty'])) ?>" oninput="quoteRecalc()">
+                        <input name="item_price[]"  type="number" step="0.01" min="0" value="<?= number_format((float)$it['price'], 2, '.', '') ?>" oninput="quoteRecalc()">
+                        <button type="button" class="quote-del" onclick="this.closest('.quote-row').remove();quoteRecalc()" aria-label="Quitar artículo">×</button>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="quote-actions">
+                    <button type="button" class="btn outline btn-small" onclick="addQuoteRow()">＋ Agregar artículo</button>
+                    <div class="quote-total">TOTAL: <b><?= e($currentQuote['currency_symbol'] ?? '$') ?><span id="quote-total">0,00</span></b></div>
+                </div>
+
+                <div class="prod-edit-grid" style="margin-top:26px">
+                    <label>Validez del presupuesto (días)
+                        <input name="valid_days" type="number" min="1" max="365" value="<?= (int)($currentQuote['valid_days'] ?? 7) ?>">
+                    </label>
+                </div>
+
+                <label style="margin-top:14px">Observaciones / condiciones
+                    <textarea name="note" rows="3" placeholder="Ej: Precios con IVA incluido. Entrega estimada en 5 días hábiles. Sujeto a disponibilidad de stock."><?= e($currentQuote['note'] ?? '') ?></textarea>
+                </label>
+
+                <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:22px">
+                    <button class="btn yellow" type="submit"><?= $currentQuote ? 'Guardar cambios' : 'Crear presupuesto' ?></button>
+                    <a class="btn outline" href="<?= e($quoteBackUrl) ?>">Cancelar</a>
+                </div>
+            </form>
+
+            <?php if ($currentQuote): ?>
+            <div style="margin-top:16px">
+                <button class="btn outline btn-small" type="submit" form="quote-delete"
+                        onclick="return confirm('¿Eliminar el presupuesto <?= e($currentQuote['number']) ?>? No se puede deshacer.')"
+                        style="color:var(--pink);border-color:var(--pink)">🗑 Eliminar presupuesto</button>
+            </div>
+            <form method="post" id="quote-delete" style="display:none">
+                <?= csrf_field() ?>
+                <input type="hidden" name="act"      value="delete_quote">
+                <input type="hidden" name="_tab"     value="presupuestos">
+                <input type="hidden" name="quote_id" value="<?= (int)$currentQuote['id'] ?>">
+            </form>
+            <?php endif; ?>
+
+            <script>
+            function quoteRecalc() {
+                var total = 0;
+                var rows = document.querySelectorAll('#quote-rows .quote-row');
+                for (var i = 0; i < rows.length; i++) {
+                    var q = parseFloat(String(rows[i].querySelector('input[name="item_qty[]"]').value).replace(',', '.')) || 0;
+                    var p = parseFloat(String(rows[i].querySelector('input[name="item_price[]"]').value).replace(',', '.')) || 0;
+                    total += q * p;
+                }
+                var el = document.getElementById('quote-total');
+                if (el) el.textContent = total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            function addQuoteRow() {
+                var wrap = document.getElementById('quote-rows');
+                if (!wrap) return;
+                var row = document.createElement('div');
+                row.className = 'quote-row';
+                row.innerHTML = "<input name='item_title[]' placeholder='Nombre del producto' required>"
+                    + "<input name='item_detail[]' placeholder='Opcional'>"
+                    + "<input name='item_qty[]' type='number' step='0.01' min='0.01' value='1' oninput='quoteRecalc()'>"
+                    + "<input name='item_price[]' type='number' step='0.01' min='0' value='0' oninput='quoteRecalc()'>"
+                    + "<button type='button' class='quote-del' aria-label='Quitar artículo' onclick=\"this.closest('.quote-row').remove();quoteRecalc()\">&times;</button>";
+                wrap.appendChild(row);
+                var first = row.querySelector('input');
+                if (first) first.focus();
+                quoteRecalc();
+            }
+            function copyQuoteUrl(btn) {
+                var input = document.getElementById('quote-public-url');
+                if (!input) return;
+                var done = function () {
+                    var old = btn.textContent;
+                    btn.textContent = '✓ Copiado';
+                    setTimeout(function () { btn.textContent = old; }, 1600);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(input.value).then(done, function () { input.select(); document.execCommand('copy'); done(); });
+                } else {
+                    input.select();
+                    document.execCommand('copy');
+                    done();
+                }
+            }
+            quoteRecalc();
+            </script>
+
+        <?php endif; ?>
 
     <!-- ══════════════════════════════════════════════════════════════════
          PESTAÑA: CONFIGURACIÓN
     ═══════════════════════════════════════════════════════════════════ -->
     <?php elseif ($tab === 'configuracion'): ?>
+
+        <!-- ── USUARIOS DEL PANEL ────────────────────────────────────────── -->
+        <div style="margin-bottom:40px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px">
+                <div>
+                    <h2 style="margin:0">Usuarios del panel</h2>
+                    <p style="margin:4px 0 0">Creá <b>empleados</b> con acceso solo a las secciones que necesiten, o <b>administradores</b> con acceso total.</p>
+                </div>
+                <details class="panel-toggle">
+                    <summary class="btn yellow" style="margin:0">＋ Agregar usuario</summary>
+                    <form method="post" class="panel-toggle-body">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="act"  value="create_staff">
+                        <input type="hidden" name="_tab" value="configuracion">
+                        <div class="prod-edit-grid">
+                            <label>Nombre y apellido *
+                                <input name="name" required placeholder="Ej: Lucía Fernández">
+                            </label>
+                            <label>Email *
+                                <input name="email" type="email" required placeholder="empleado@correo.com">
+                            </label>
+                            <label>Contraseña inicial *
+                                <input name="password" minlength="6" required placeholder="Mínimo 6 caracteres">
+                            </label>
+                            <label>Rol
+                                <select name="role">
+                                    <option value="employee">Empleado (permisos limitados)</option>
+                                    <option value="admin">Administrador (acceso total)</option>
+                                </select>
+                            </label>
+                        </div>
+                        <fieldset style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:8px 0 0">
+                            <legend style="font-size:12px;font-weight:700;color:var(--gray);padding:0 6px">Secciones habilitadas (solo para empleados)</legend>
+                            <div style="display:flex;gap:18px;flex-wrap:wrap">
+                                <?php foreach (delegable_tabs() as $t): ?>
+                                    <label style="flex-direction:row;align-items:center;gap:8px;margin:0;font-size:14px">
+                                        <input type="checkbox" name="perms[]" value="<?= e($t) ?>">
+                                        <?= e(panel_tab_labels()[$t]) ?>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </fieldset>
+                        <button class="btn yellow" type="submit" style="margin-top:16px">Crear usuario</button>
+                    </form>
+                </details>
+            </div>
+
+            <?php if (!$staffUsers): ?>
+                <div class="access-box"><p style="margin:0">No hay usuarios de panel registrados.</p></div>
+            <?php else: foreach ($staffUsers as $su):
+                $isSelf  = (int)$su['id'] === (int)(current_user()['id'] ?? 0);
+                $suRole  = (string)$su['role'];
+                $suPerms = $suRole === 'admin' ? panel_tabs() : staff_perms($su);
+            ?>
+                <div class="admin-row client-card">
+                    <div class="client-card-head">
+                        <div class="admin-row-info">
+                            <b><?= e($su['name']) ?><?= $isSelf ? ' <small style="color:var(--gray);font-weight:400">(vos)</small>' : '' ?></b>
+                            <p><?= e($su['email']) ?></p>
+                            <div class="admin-row-meta" style="margin-top:6px;gap:8px">
+                                <?php if ($suRole === 'admin'): ?>
+                                    <span class="badge badge-pink">★ Administrador</span>
+                                <?php else: ?>
+                                    <span class="badge badge-blue">Empleado</span>
+                                <?php endif; ?>
+                                <small>Desde el <?= e(date('d/m/Y', strtotime((string)$su['created_at']))) ?></small>
+                            </div>
+                            <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+                                <?php foreach (panel_tabs() as $t):
+                                    $has = in_array($t, $suPerms, true); ?>
+                                    <span class="badge <?= $has ? 'badge-green' : 'badge-gray' ?>" style="<?= $has ? '' : 'opacity:.5' ?>">
+                                        <?= $has ? '✓' : '✕' ?> <?= e(strip_tags(panel_tab_labels()[$t])) ?>
+                                    </span>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php if (!$isSelf): ?>
+                        <div class="admin-row-actions">
+                            <form method="post" onsubmit="return confirm('¿Eliminar a <?= addslashes(e($su['name'])) ?> del panel?')">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="act"     value="delete_staff">
+                                <input type="hidden" name="_tab"    value="configuracion">
+                                <input type="hidden" name="user_id" value="<?= (int)$su['id'] ?>">
+                                <button class="btn outline btn-small" type="submit" style="color:var(--pink);border-color:var(--pink)">🗑 Eliminar</button>
+                            </form>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="client-tools">
+                        <details>
+                            <summary class="btn outline btn-small">✎ Rol y permisos</summary>
+                            <form method="post" class="client-tool-form">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="act"     value="update_staff">
+                                <input type="hidden" name="_tab"    value="configuracion">
+                                <input type="hidden" name="user_id" value="<?= (int)$su['id'] ?>">
+                                <label>Rol
+                                    <select name="role">
+                                        <option value="employee" <?= $suRole === 'employee' ? 'selected' : '' ?>>Empleado (permisos limitados)</option>
+                                        <option value="admin" <?= $suRole === 'admin' ? 'selected' : '' ?>>Administrador (acceso total)</option>
+                                    </select>
+                                </label>
+                                <fieldset style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0 0">
+                                    <legend style="font-size:12px;font-weight:700;color:var(--gray);padding:0 6px">Secciones habilitadas (solo para empleados)</legend>
+                                    <div style="display:flex;gap:18px;flex-wrap:wrap">
+                                        <?php foreach (delegable_tabs() as $t): ?>
+                                            <label style="flex-direction:row;align-items:center;gap:8px;margin:0;font-size:14px">
+                                                <input type="checkbox" name="perms[]" value="<?= e($t) ?>" <?= in_array($t, $suPerms, true) ? 'checked' : '' ?>>
+                                                <?= e(panel_tab_labels()[$t]) ?>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </fieldset>
+                                <button class="btn yellow btn-small" type="submit" style="margin-top:14px">Guardar</button>
+                            </form>
+                        </details>
+
+                        <details>
+                            <summary class="btn outline btn-small">🔑 Cambiar contraseña</summary>
+                            <form method="post" class="client-tool-form">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="act"     value="set_staff_password">
+                                <input type="hidden" name="_tab"    value="configuracion">
+                                <input type="hidden" name="user_id" value="<?= (int)$su['id'] ?>">
+                                <label>Nueva contraseña
+                                    <input name="password" minlength="6" required placeholder="Mínimo 6 caracteres">
+                                </label>
+                                <button class="btn yellow btn-small" type="submit" style="margin-top:12px">Guardar contraseña</button>
+                            </form>
+                        </details>
+                    </div>
+                </div>
+            <?php endforeach; endif; ?>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--line); margin:0 0 36px">
+
+        <!-- ── INSTAGRAM (PORTADA) ───────────────────────────────────────── -->
+        <div style="margin-bottom:40px">
+            <h2 style="margin:0 0 6px">Instagram en la portada</h2>
+            <p style="margin:0 0 20px">
+                Cargá las últimas publicaciones que querés mostrar en la página principal. Podés subir la imagen o pegar su enlace,
+                y opcionalmente el link de la publicación para que al hacer clic se abra en Instagram.
+            </p>
+
+            <form method="post" enctype="multipart/form-data">
+                <?= csrf_field() ?>
+                <input type="hidden" name="act"  value="save_instagram">
+                <input type="hidden" name="_tab" value="configuracion">
+
+                <label style="max-width:420px">Usuario de Instagram
+                    <input name="instagram_handle" value="<?= e(instagram_handle()) ?>" placeholder="@ser.insumos">
+                </label>
+
+                <?php
+                $igRows = instagram_posts();
+                while (count($igRows) < 6) $igRows[] = ['image' => '', 'link' => '', 'caption' => ''];
+                ?>
+                <div class="prod-edit-grid">
+                    <?php foreach (array_slice($igRows, 0, 6) as $p): ?>
+                        <div style="border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px">
+                            <?php if ($p['image'] !== ''): ?>
+                                <img src="<?= e($p['image']) ?>" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;background:#f3f5f7">
+                            <?php endif; ?>
+                            <label style="margin:0">Subir imagen
+                                <input name="ig_file[]" type="file" accept="image/jpeg,image/png,image/webp">
+                            </label>
+                            <label style="margin:0">O pegar enlace de imagen
+                                <input name="ig_image[]" value="<?= e($p['image']) ?>" placeholder="https://...jpg">
+                            </label>
+                            <label style="margin:0">Link de la publicación
+                                <input name="ig_link[]" value="<?= e($p['link']) ?>" placeholder="https://www.instagram.com/p/...">
+                            </label>
+                            <label style="margin:0">Texto corto (opcional)
+                                <input name="ig_caption[]" value="<?= e($p['caption']) ?>" maxlength="90" placeholder="Ej: Nueva tanda de tintas">
+                            </label>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <button class="btn yellow" type="submit" style="margin-top:18px">Guardar Instagram</button>
+                <small style="display:block;color:var(--gray);font-size:12px;margin-top:10px">
+                    Las casillas vacías se ignoran. Si subís un archivo y además hay un enlace, se usa el archivo subido.
+                </small>
+            </form>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--line); margin:0 0 36px">
 
         <!-- ── MODO MANTENIMIENTO ────────────────────────────────────────── -->
         <div id="mantenimiento" style="background:<?= setting('maintenance_mode', '0') === '1' ? '#fff1f2' : '#f8fafc' ?>;border:2px solid <?= setting('maintenance_mode', '0') === '1' ? '#f43f5e' : 'var(--line)' ?>;border-radius:14px;padding:24px;margin-bottom:34px;max-width:760px;box-shadow:0 4px 14px rgba(0,0,0,0.03)">
@@ -2411,6 +2954,14 @@ input:checked ~ .confirm-revoke { display:inline; }
             </a>
         </div>
 
+    <?php else: ?>
+        <div class="system-note" style="border-radius:8px">
+            <b>Tu usuario todavía no tiene secciones habilitadas.</b>
+            <p style="margin:8px 0 0;color:var(--gray);font-size:14px">
+                Pedile a un administrador que te asigne los permisos que necesitás (Clientes, Pedidos, Productos o Presupuestos)
+                desde <b>Configuración → Usuarios del panel</b>.
+            </p>
+        </div>
     <?php endif; ?>
 
 </main>

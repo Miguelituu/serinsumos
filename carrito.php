@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         /* Verificar que el producto sea visible (no oculto por el admin) */
-        if (isset($product['_visible']) && !$product['_visible'] && !is_admin()) {
+        if (isset($product['_visible']) && !$product['_visible'] && !is_staff()) {
             set_flash('error', 'Este producto no está disponible actualmente.');
             redirect('catalogo.php');
         }
