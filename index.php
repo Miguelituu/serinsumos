@@ -115,6 +115,9 @@ $totalBanners = count($banners);
             <span class="ig-ico" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="1.9"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.4" cy="6.6" r="1.15" fill="#fff" stroke="none"/></svg>
             </span>
+            <?php if ($igPost['caption'] !== ''): ?>
+                <span class="ig-cap"><?= e($igPost['caption']) ?></span>
+            <?php endif; ?>
         </a>
         <?php endforeach; ?>
     </div>

@@ -463,21 +463,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
             }
 
-            /* Publicaciones nuevas: cada fila tiene un solo campo, la foto. */
+            /* Publicación nueva: una sola, con la foto subida o con el enlace pegado. */
+            $nImg  = trim((string)($_POST['ig_image']['n0']   ?? ''));
+            $nLink = trim((string)($_POST['ig_link']['n0']    ?? ''));
+            $nCap  = trim((string)($_POST['ig_caption']['n0'] ?? ''));
             $files = $_FILES['ig_file'] ?? null;
-            if (is_array($files['tmp_name'] ?? null)) {
-                foreach ($files['tmp_name'] as $key => $tmp) {
-                    $key = (string)$key;
-                    if ($key === '' || $key[0] !== 'n') continue;
-                    if ((int)($files['error'][$key] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
-                    $img = save_uploaded_image([
-                        'tmp_name' => $files['tmp_name'][$key],
-                        'error'    => $files['error'][$key],
-                        'size'     => $files['size'][$key],
-                    ], 'instagram', 8);
-                    /* Entra visible; después se puede fijar u ocultar desde la lista */
-                    $nuevas[] = ['image' => $img, 'link' => '', 'caption' => '', 'visible' => true, 'pinned' => false];
-                }
+            if (is_array($files['tmp_name'] ?? null) && (int)($files['error']['n0'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                $nImg = save_uploaded_image([
+                    'tmp_name' => $files['tmp_name']['n0'],
+                    'error'    => $files['error']['n0'],
+                    'size'     => $files['size']['n0'],
+                ], 'instagram', 8);
+            }
+            if ($nImg !== '') {
+                $nuevas[] = [
+                    'image'   => $nImg,
+                    'link'    => $nLink,
+                    'caption' => $nCap,
+                    'visible' => (string)($_POST['ig_visible']['n0'] ?? '1') === '1',
+                    'pinned'  => (string)($_POST['ig_pinned']['n0']  ?? '0') === '1',
+                ];
             }
 
             save_instagram_posts(array_merge($nuevas, $vigentes));
@@ -710,22 +715,6 @@ input:checked ~ .confirm-revoke { display:inline; }
     font-weight: 600;
 }
 .ig-del:hover { background: #ffe4ee; border-color: #f2a8bf; }
-
-/* ── Instagram: subir publicaciones nuevas (un solo campo por foto) ─── */
-.ig-new-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; max-width: 860px; }
-.ig-new {
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-    min-height: 140px; padding: 18px 14px; margin: 0;
-    background: #fff; border: 2px dashed var(--line); border-radius: 12px;
-    text-align: center; cursor: pointer;
-    transition: border-color .18s ease, background .18s ease;
-}
-.ig-new:hover { border-color: var(--blue); background: #f7fbff; }
-.ig-new > span { font-size: 24px; line-height: 1; }
-.ig-new > small { color: var(--gray); font-size: 12px; }
-.ig-new input[type="file"] { width: 100%; margin: 0; padding: 0; border: 0; background: none; font-size: 11.5px; }
-@media(max-width: 1100px) { .ig-new-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media(max-width: 700px)  { .ig-new-grid { grid-template-columns: 1fr; } }
 
 /* ── Paneles desplegables y cajas ───────────────────────────────────── */
 .panel-toggle { margin: 0; }
@@ -3124,11 +3113,10 @@ input:checked ~ .confirm-revoke { display:inline; }
             $igVisibles = 0;
             foreach ($igTodas as $igP) { if ($igP['visible']) $igVisibles++; }
             $igLibres = max(0, INSTAGRAM_MAX_POSTS - count($igTodas));
-            $igFilas  = $igLibres > 0 ? min(6, $igLibres) : 0;
             ?>
 
             <p style="margin:0 0 22px;max-width:820px">
-                Las publicaciones se suben <b>a mano</b>: elegís la foto y listo, no hace falta completar nada más.
+                Las publicaciones se cargan <b>a mano</b> desde acá: subís la foto o pegás su enlace y, si querés, le agregás el link de la publicación y un texto corto.
                 La portada muestra <b>siempre <?= $igCupo ?></b>: primero las fijadas y después las más recientes.
                 De las <b><?= count($igTodas) ?></b> cargadas hay <b><?= $igVisibles ?></b> visibles y ahora se están viendo <b><?= count($igPortada) ?></b>.
             </p>
@@ -3182,28 +3170,44 @@ input:checked ~ .confirm-revoke { display:inline; }
                 <p style="margin:26px 0 14px;color:var(--gray)">Todavía no cargaste publicaciones.</p>
             <?php endif; ?>
 
-            <?php if ($igFilas > 0): ?>
-                <h3 style="margin:34px 0 6px">Subir publicaciones nuevas</h3>
+            <?php if ($igLibres > 0): ?>
+                <h3 style="margin:34px 0 6px">Subir una publicación nueva</h3>
                 <p style="margin:0 0 14px;color:var(--gray);font-size:13px">
-                    Elegí las fotos que quieras sumar (una por recuadro) y guardá: los recuadros que dejes vacíos se ignoran.
+                    Subí la foto o pegá su enlace, completá lo que quieras y guardá: la nueva entra arriba de todo.
                     Podés tener hasta <?= INSTAGRAM_MAX_POSTS ?> publicaciones en total.
                 </p>
                 <form method="post" enctype="multipart/form-data">
                     <?= csrf_field() ?>
                     <input type="hidden" name="act"  value="save_instagram">
                     <input type="hidden" name="_tab" value="configuracion">
-                    <div class="ig-new-grid">
-                        <?php for ($n = 0; $n < $igFilas; $n++): ?>
-                            <label class="ig-new">
-                                <span aria-hidden="true">🖼️</span>
-                                <small>Publicación <?= $n + 1 ?></small>
-                                <input name="ig_file[n<?= $n ?>]" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Elegir la foto de la publicación nueva <?= $n + 1 ?>">
+                    <div class="ig-grid" style="grid-template-columns:minmax(0,320px)">
+                        <div>
+                            <div style="height:130px;border-radius:8px;background:#f3f5f7;display:grid;place-items:center;color:var(--gray);font-size:12px">Sin imagen</div>
+                            <div class="ig-caps"><span class="badge badge-blue">Nueva</span></div>
+                            <label>Subir imagen
+                                <input name="ig_file[n0]" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Subir la imagen de la publicación nueva">
                             </label>
-                        <?php endfor; ?>
+                            <label>O pegar enlace de imagen
+                                <input name="ig_image[n0]" placeholder="https://...jpg">
+                            </label>
+                            <label>Link de la publicación
+                                <input name="ig_link[n0]" placeholder="https://www.instagram.com/p/...">
+                            </label>
+                            <label>Texto corto (opcional)
+                                <input name="ig_caption[n0]" maxlength="90" placeholder="Ej: Nueva tanda de tintas">
+                            </label>
+                            <div class="ig-toggles">
+                                <input type="hidden" name="ig_visible[n0]" value="0">
+                                <label><input type="checkbox" name="ig_visible[n0]" value="1" checked> Mostrar en la portada</label>
+                                <input type="hidden" name="ig_pinned[n0]" value="0">
+                                <label><input type="checkbox" name="ig_pinned[n0]" value="1"> 📌 Fijar: se ve siempre</label>
+                            </div>
+                        </div>
                     </div>
-                    <button class="btn yellow" type="submit" style="margin-top:18px">Subir publicaciones</button>
+                    <button class="btn yellow" type="submit" style="margin-top:18px">Subir publicación</button>
                     <small style="display:block;color:var(--gray);font-size:12px;margin-top:10px">
-                        Formatos JPG, PNG o WebP de hasta 8 MB. Las nuevas entran visibles, arriba de las más recientes.
+                        Si subís un archivo y además hay un enlace, se usa el archivo subido.
+                        Las nuevas entran visibles, arriba de las más recientes.
                     </small>
                 </form>
             <?php else: ?>

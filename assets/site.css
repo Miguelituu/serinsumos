@@ -1251,6 +1251,23 @@ html { overflow-x: clip; }
 }
 .home-insta-grid > a:hover .ig-ico,
 .home-insta-grid > a:focus-visible .ig-ico { opacity: 1; transform: none; }
+.home-insta-grid .ig-cap {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 26px 14px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #fff;
+    background: linear-gradient(transparent, rgba(23, 37, 48, .82));
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .25s ease, transform .25s ease;
+}
+.home-insta-grid > a:hover .ig-cap,
+.home-insta-grid > a:focus-visible .ig-cap { opacity: 1; transform: none; }
 
 @media (max-width: 900px) {
     .home-values { padding: 56px 22px 0; }
@@ -1261,5 +1278,6 @@ html { overflow-x: clip; }
 @media (max-width: 760px) {
     .home-insta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .home-insta-grid .ig-ico { opacity: 1; transform: none; width: 28px; height: 28px; }
+    .home-insta-grid .ig-cap { display: none; }
 }
 
