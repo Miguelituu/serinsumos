@@ -978,6 +978,33 @@ input:checked ~ .confirm-revoke { display:inline; }
 
                     </div>
 
+                    <!-- Documento PDF del pedido -->
+                    <?php
+                    $pdfDefault = match ($ordStatus) {
+                        'confirmed', 'payment_uploaded' => 'pendiente',
+                        'completed'                     => 'pagado',
+                        default                         => 'presupuesto',
+                    };
+                    ?>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-top:1px dashed var(--line);margin-top:18px;padding-top:16px">
+                        <div style="flex:1 1 270px;min-width:230px">
+                            <b style="font-size:14px">📄 Documento del pedido (PDF)</b>
+                            <div style="font-size:12.5px;color:var(--gray)">
+                                Elegí el estado del documento y generá un resumen del pedido para enviarle al cliente.
+                            </div>
+                        </div>
+                        <form method="get" action="pedido-pdf.php" style="display:flex;gap:8px;align-items:center;margin:0;flex-wrap:wrap;max-width:none">
+                            <input type="hidden" name="id" value="<?= $ordId ?>">
+                            <select name="estado" aria-label="Estado del documento" style="width:auto;min-width:200px;margin:0;flex:1 1 200px">
+                                <option value="presupuesto" <?= $pdfDefault === 'presupuesto' ? 'selected' : '' ?>>📝 Presupuesto</option>
+                                <option value="pendiente" <?= $pdfDefault === 'pendiente' ? 'selected' : '' ?>>⏳ Pendiente de pago</option>
+                                <option value="pagado" <?= $pdfDefault === 'pagado' ? 'selected' : '' ?>>✅ Pagado</option>
+                            </select>
+                            <button class="btn yellow btn-small" type="submit" name="dl" value="0" formtarget="_blank" style="margin:0">Ver PDF ↗</button>
+                            <button class="btn outline btn-small" type="submit" name="dl" value="1" style="margin:0">⬇ Descargar</button>
+                        </form>
+                    </div>
+
                 </div>
             <?php endforeach; ?>
 
