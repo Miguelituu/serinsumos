@@ -42,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'set_staff_password'   => 'configuracion',
             'delete_staff'         => 'configuracion',
             'save_instagram'       => 'configuracion',
+            'save_instagram_source' => 'configuracion',
         ];
         $requiredTab = $ACTION_TABS[(string)$act] ?? '';
         if ($requiredTab !== '' && !can($requiredTab)) {
@@ -438,44 +439,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_flash('success', 'Presupuesto eliminado.');
 
         /* ── Instagram (portada) ─────────────────────────────────────── */
-        } elseif ($act === 'save_instagram') {
-            $images   = (array)($_POST['ig_image']   ?? []);
-            $links    = (array)($_POST['ig_link']    ?? []);
-            $caps     = (array)($_POST['ig_caption'] ?? []);
-            $visibles = (array)($_POST['ig_visible'] ?? []);
-            $pinneds  = (array)($_POST['ig_pinned']  ?? []);
-            $borrar   = (array)($_POST['ig_delete']  ?? []);
-            $files    = $_FILES['ig_file'] ?? null;
+        } elseif ($act === 'save_instagram_source') {
+            $modo = (string)($_POST['instagram_mode'] ?? 'auto') === 'manual' ? 'manual' : 'auto';
+            save_setting('instagram_mode', $modo);
+            save_setting('instagram_source', (string)($_POST['instagram_source'] ?? 'behold') === 'graph' ? 'graph' : 'behold');
+            save_setting('instagram_behold_url', trim((string)($_POST['instagram_behold_url'] ?? '')));
+            save_setting('instagram_handle', trim((string)($_POST['instagram_handle'] ?? '')));
+            $token = trim((string)($_POST['instagram_token'] ?? ''));
+            if ($token !== instagram_token()) save_setting('instagram_token_at', '0');   /* token nuevo: aún no se renovó */
+            save_setting('instagram_token', $token);
 
-            $nuevas   = [];   /* se cargan ahora: son las más recientes, van al principio */
-            $vigentes = [];   /* ya estaban cargadas: conservan su orden */
-
-            foreach ($images as $key => $rawImg) {
-                $key = (string)$key;
-                $img = trim((string)$rawImg);
-                if ($files && is_array($files['tmp_name'] ?? null) && isset($files['tmp_name'][$key]) && (int)($files['error'][$key] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-                    $img = save_uploaded_image([
-                        'tmp_name' => $files['tmp_name'][$key],
-                        'error'    => $files['error'][$key],
-                        'size'     => $files['size'][$key],
-                    ], 'instagram', 8);
-                }
-                if ($img === '') continue;                                     /* fila vacía: se ignora */
-                if ((string)($borrar[$key] ?? '0') === '1') continue;          /* el admin pidió quitarla */
-
-                $post = [
-                    'image'   => $img,
-                    'link'    => (string)($links[$key] ?? ''),
-                    'caption' => (string)($caps[$key] ?? ''),
-                    'visible' => (string)($visibles[$key] ?? '0') === '1',
-                    'pinned'  => (string)($pinneds[$key]  ?? '0') === '1',
-                ];
-                if ($key !== '' && $key[0] === 'n') $nuevas[] = $post; else $vigentes[] = $post;
+            if ($modo === 'manual') {
+                set_flash('success', 'Listo: la portada toma las publicaciones cargadas a mano.');
+            } else {
+                $r = instagram_refresh(true);
+                set_flash($r['ok'] ? 'success' : 'error', $r['ok']
+                    ? 'Listo: se trajeron ' . (int)$r['posts'] . ' publicaciones desde Instagram. De ahora en más se actualizan solas.'
+                    : 'No se pudieron traer las publicaciones. ' . $r['error']);
             }
 
-            save_setting('instagram_handle', trim((string)($_POST['instagram_handle'] ?? '')));
-            save_instagram_posts(array_merge($nuevas, $vigentes));
-            set_flash('success', 'Sección de Instagram actualizada. La portada muestra las 6 más recientes entre las visibles.');
+        } elseif ($act === 'save_instagram') {
+            if (instagram_mode() === 'auto') {
+                /* En automático sólo se guardan los ajustes de mostrar/ocultar y fijar. */
+                $visibles = (array)($_POST['ig_visible'] ?? []);
+                $pinneds  = (array)($_POST['ig_pinned']  ?? []);
+                $map = [];
+                foreach ($visibles as $id => $v) {
+                    $id = (string)$id;
+                    if ($id === '') continue;
+                    $map[$id] = ['visible' => (string)$v === '1', 'pinned' => (string)($pinneds[$id] ?? '0') === '1'];
+                }
+                save_instagram_overrides($map);
+                set_flash('success', 'Ajustes guardados. La portada muestra siempre las 6 más recientes y las fijadas no salen.');
+            } else {
+                $images   = (array)($_POST['ig_image']   ?? []);
+                $links    = (array)($_POST['ig_link']    ?? []);
+                $caps     = (array)($_POST['ig_caption'] ?? []);
+                $visibles = (array)($_POST['ig_visible'] ?? []);
+                $pinneds  = (array)($_POST['ig_pinned']  ?? []);
+                $borrar   = (array)($_POST['ig_delete']  ?? []);
+                $files    = $_FILES['ig_file'] ?? null;
+
+                $nuevas   = [];   /* se cargan ahora: son las más recientes, van al principio */
+                $vigentes = [];   /* ya estaban cargadas: conservan su orden */
+
+                foreach ($images as $key => $rawImg) {
+                    $key = (string)$key;
+                    $img = trim((string)$rawImg);
+                    if ($files && is_array($files['tmp_name'] ?? null) && isset($files['tmp_name'][$key]) && (int)($files['error'][$key] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                        $img = save_uploaded_image([
+                            'tmp_name' => $files['tmp_name'][$key],
+                            'error'    => $files['error'][$key],
+                            'size'     => $files['size'][$key],
+                        ], 'instagram', 8);
+                    }
+                    if ($img === '') continue;                                     /* fila vacía: se ignora */
+                    if ((string)($borrar[$key] ?? '0') === '1') continue;          /* el admin pidió quitarla */
+
+                    $post = [
+                        'image'   => $img,
+                        'link'    => (string)($links[$key] ?? ''),
+                        'caption' => (string)($caps[$key] ?? ''),
+                        'visible' => (string)($visibles[$key] ?? '0') === '1',
+                        'pinned'  => (string)($pinneds[$key]  ?? '0') === '1',
+                    ];
+                    if ($key !== '' && $key[0] === 'n') $nuevas[] = $post; else $vigentes[] = $post;
+                }
+
+                save_instagram_posts(array_merge($nuevas, $vigentes));
+                set_flash('success', 'Sección de Instagram actualizada. La portada muestra las 6 más recientes entre las visibles.');
+            }
 
         } else {
             set_flash('error', 'Acción no reconocida.');
@@ -3009,20 +3042,160 @@ input:checked ~ .confirm-revoke { display:inline; }
         <!-- ── INSTAGRAM (PORTADA) ───────────────────────────────────────── -->
         <div style="margin-bottom:40px">
             <h2 style="margin:0 0 6px">Instagram en la portada</h2>
-            <p style="margin:0 0 20px">
-                Cargá todas las publicaciones que quieras: la portada muestra <b>siempre las 6 más recientes</b> entre las visibles.
-                Podés <b>ocultar</b> las que no quieras mostrar y <b>fijar</b> las que tengan que verse siempre, aunque sean más antiguas.
-                Subí la imagen o pegá su enlace, y opcionalmente el link de la publicación.
-            </p>
-
             <?php
+            $igModo   = instagram_mode();
+            $igFuente = instagram_source();
+            $igCache  = instagram_cache();
+
+            /* En automático se actualiza solo al entrar al panel (cada unas horas) */
+            if ($igModo === 'auto') {
+                instagram_refresh(false);
+                $igCache = instagram_cache();
+            }
+
             $igTodas    = instagram_posts();
             $igCupo     = INSTAGRAM_HOME_LIMIT;
             $igPortada  = instagram_public_indexes($igCupo);
             $igVisibles = 0;
             foreach ($igTodas as $igP) { if ($igP['visible']) $igVisibles++; }
-            $igLibres   = max(0, INSTAGRAM_MAX_POSTS - count($igTodas));
-            $igFilas    = $igLibres > 0 ? min(6, $igLibres) : 0;
+            $igLibres = max(0, INSTAGRAM_MAX_POSTS - count($igTodas));
+            $igFilas  = $igLibres > 0 ? min(6, $igLibres) : 0;
+            $igCron   = site_url('instagram-cron.php?k=' . urlencode(instagram_cron_key()));
+            ?>
+
+            <p style="margin:0 0 20px">
+                La portada muestra <b>siempre 6 publicaciones</b>: primero las fijadas y después las más recientes.
+                Dejalo en <b>automático</b> y se van actualizando solas; igual podés <b>ocultar</b> las que no quieras
+                y <b>fijar</b> las que tengan que verse siempre.
+            </p>
+
+            <form method="post" style="max-width:none">
+                <?= csrf_field() ?>
+                <input type="hidden" name="act"  value="save_instagram_source">
+                <input type="hidden" name="_tab" value="configuracion">
+                <div class="prod-edit-grid" style="max-width:900px">
+                    <label>¿Cómo se cargan las publicaciones?
+                        <select name="instagram_mode">
+                            <option value="auto"   <?= $igModo === 'auto'   ? 'selected' : '' ?>>Automática, desde Instagram (recomendado)</option>
+                            <option value="manual" <?= $igModo === 'manual' ? 'selected' : '' ?>>Manual, subiendo las imágenes a mano</option>
+                        </select>
+                    </label>
+                    <label>Desde dónde se leen
+                        <select name="instagram_source">
+                            <option value="behold" <?= $igFuente === 'behold' ? 'selected' : '' ?>>Behold (feed JSON, sin app de Meta)</option>
+                            <option value="graph"  <?= $igFuente === 'graph'  ? 'selected' : '' ?>>Instagram oficial (con token)</option>
+                        </select>
+                    </label>
+                    <label>Dirección del feed de Behold
+                        <input name="instagram_behold_url" value="<?= e(instagram_behold_url()) ?>" placeholder="https://feeds.behold.so/xxxxxxxx">
+                    </label>
+                    <label>Token de Instagram (sólo para el origen oficial)
+                        <input name="instagram_token" value="<?= e(instagram_token()) ?>" placeholder="IGQVJ...">
+                    </label>
+                    <label>Usuario de Instagram
+                        <input name="instagram_handle" value="<?= e(instagram_handle()) ?>" placeholder="@ser.insumos">
+                    </label>
+                    <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap">
+                        <button class="btn yellow btn-small" type="submit" name="accion" value="guardar" style="margin:0">Guardar</button>
+                        <button class="btn outline btn-small" type="submit" name="accion" value="actualizar" style="margin:0">🔄 Actualizar ahora</button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="panel-box" style="margin:20px 0;max-width:900px">
+                <b style="display:block;margin-bottom:6px">Estado</b>
+                <div style="font-size:13px;line-height:1.9">
+                    Modo: <b><?= $igModo === 'auto' ? 'Automático' : 'Manual' ?></b>
+                    <?php if ($igModo === 'auto'): ?>
+                        — origen: <b><?= $igFuente === 'graph' ? 'Instagram oficial' : 'Behold' ?></b><br>
+                        Última actualización: <b><?= e(instagram_ago((int)$igCache['fetched_at'])) ?></b>
+                        <?php if ($igCache['fetched_at'] > 0): ?>(<?= count($igCache['posts']) ?> publicaciones traídas)<?php endif; ?>
+                        <?php if ($igFuente === 'behold' && instagram_behold_url() === ''): ?>
+                            <br><span style="color:var(--pink)">Falta pegar la dirección del feed.</span>
+                        <?php endif; ?>
+                        <?php if ($igFuente === 'graph' && instagram_token() === ''): ?>
+                            <br><span style="color:var(--pink)">Falta pegar el token de Instagram.</span>
+                        <?php endif; ?>
+                        <?php if ($igCache['error'] !== ''): ?>
+                            <br><span style="color:var(--pink)">Último aviso: <?= e($igCache['error']) ?>. Se sigue mostrando lo último que se trajo.</span>
+                        <?php endif; ?>
+                        <br>
+                    <?php endif; ?>
+                    Hay <b><?= count($igTodas) ?></b> publicación(es) y <b><?= $igVisibles ?></b> visible(s):
+                    ahora se están viendo <b><?= count($igPortada) ?></b>.
+                </div>
+
+                <?php if ($igModo === 'auto'): ?>
+                    <details class="panel-toggle" style="margin-top:16px">
+                        <summary class="btn outline btn-small" style="margin:0">Cómo conectarlo (se hace una sola vez)</summary>
+                        <div class="panel-toggle-body" style="font-size:13px">
+                            <ol style="margin:0 0 14px 18px;padding:0;line-height:1.9">
+                                <li>La cuenta de Instagram tiene que ser <b>profesional</b> (Empresa o Creador).
+                                    Si hoy es personal: Instagram → Configuración → Tipo de cuenta → <b>Cambiar a cuenta profesional</b> (es gratis).</li>
+                                <li>Entrá a <a href="https://app.behold.so/register" target="_blank" rel="noopener noreferrer">behold.so</a> y creá una cuenta gratis.</li>
+                                <li>En su panel, tocá <b>Connect</b> y autorizá <b><?= e(instagram_handle()) ?></b> (aceptá todos los permisos, aunque digan "opcional").</li>
+                                <li>Creá un feed nuevo y elegí el tipo <b>JSON</b>.</li>
+                                <li>Copiá la dirección que te da (algo como <code>https://feeds.behold.so/xxxxxxxx</code>) y pegala arriba, en <b>Dirección del feed de Behold</b>.</li>
+                                <li>Tocá <b>Guardar</b>: el sitio la lee solo y baja las fotos a tu propio servidor.</li>
+                            </ol>
+                            <p style="margin:0;color:var(--gray)">
+                                Con el plan gratis alcanza: trae hasta 6 publicaciones y se actualiza una vez por día.
+                                Si el servicio se cae, la portada sigue mostrando lo último que trajo.
+                            </p>
+                            <p style="margin:12px 0 0;color:var(--gray)">
+                                Para que se actualice aunque no entres al panel, podés programar esta dirección como <b>cron</b> (por ejemplo cada 6 horas):<br>
+                                <code style="word-break:break-all"><?= e($igCron) ?></code>
+                            </p>
+                        </div>
+                    </details>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($igModo === 'auto'): ?>
+                <h3 style="margin:26px 0 6px">Publicaciones traídas de Instagram (<?= count($igTodas) ?>)</h3>
+                <p style="margin:0 0 14px;color:var(--gray);font-size:13px">
+                    Primero las más recientes. Se actualizan solas: si ocultás una, queda oculta aunque se vuelva a traer.
+                </p>
+                <?php if ($igTodas): ?>
+                    <form method="post" style="max-width:none">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="act"  value="save_instagram">
+                        <input type="hidden" name="_tab" value="configuracion">
+                        <div class="ig-grid">
+                            <?php foreach ($igTodas as $i => $p): ?>
+                                <div>
+                                    <img src="<?= e($p['image']) ?>" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;background:#f3f5f7">
+                                    <div class="ig-caps">
+                                        <?php if (in_array($i, $igPortada, true)): ?>
+                                            <span class="badge badge-green">✓ En la portada</span>
+                                        <?php else: ?>
+                                            <span class="badge badge-gray">Fuera de la portada</span>
+                                        <?php endif; ?>
+                                        <?php if (!$p['visible']): ?><span class="badge badge-gray">Oculta</span><?php endif; ?>
+                                        <?php if ($p['pinned']): ?><span class="badge badge-pink">📌 Fijada</span><?php endif; ?>
+                                    </div>
+                                    <?php if ($p['caption'] !== ''): ?>
+                                        <small style="color:var(--gray);font-size:12px;line-height:1.5"><?= e($p['caption']) ?></small>
+                                    <?php endif; ?>
+                                    <a href="<?= e($p['link'] !== '' ? $p['link'] : instagram_profile_url()) ?>" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:var(--blue)">Ver en Instagram →</a>
+                                    <div class="ig-toggles">
+                                        <input type="hidden" name="ig_visible[<?= e($p['id']) ?>]" value="0">
+                                        <label><input type="checkbox" name="ig_visible[<?= e($p['id']) ?>]" value="1" <?= $p['visible'] ? 'checked' : '' ?>> Mostrar en la portada</label>
+                                        <input type="hidden" name="ig_pinned[<?= e($p['id']) ?>]" value="0">
+                                        <label><input type="checkbox" name="ig_pinned[<?= e($p['id']) ?>]" value="1" <?= $p['pinned'] ? 'checked' : '' ?>> 📌 Fijar: se ve siempre</label>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <button class="btn yellow btn-small" type="submit" style="margin-top:18px">Guardar publicaciones</button>
+                    </form>
+                <?php else: ?>
+                    <p style="margin:0;color:var(--gray)">
+                        Todavía no hay publicaciones. Completá el origen de arriba y tocá <b>Guardar</b>: se traen solas.
+                    </p>
+                <?php endif; ?>
+            <?php else: ?>
+            <?php
 
             /* Tarjeta de una publicación: se reusa para las cargadas y para las nuevas */
             $igCard = static function (string $key, array $p, bool $enPortada, bool $esNueva): void { ?>
@@ -3076,16 +3249,7 @@ input:checked ~ .confirm-revoke { display:inline; }
                 <input type="hidden" name="act"  value="save_instagram">
                 <input type="hidden" name="_tab" value="configuracion">
 
-                <label style="max-width:420px">Usuario de Instagram
-                    <input name="instagram_handle" value="<?= e(instagram_handle()) ?>" placeholder="@ser.insumos">
-                </label>
-
-                <div class="panel-box" style="margin:20px 0;max-width:860px">
-                    <b style="display:block;margin-bottom:6px">Cómo se arma la portada</b>
-                    Hay <b><?= count($igTodas) ?></b> publicación(es) cargada(s) y <b><?= $igVisibles ?></b> visible(s).
-                    La página principal muestra siempre <b><?= $igCupo ?></b>: primero las fijadas y después las más recientes.
-                    En este momento se están viendo <b><?= count($igPortada) ?></b>.
-                </div>
+                <h3 style="margin:0 0 14px">Publicaciones cargadas a mano</h3>
 
                 <?php if ($igTodas): ?>
                     <h3 style="margin:26px 0 6px">Publicaciones cargadas (<?= count($igTodas) ?> de <?= INSTAGRAM_MAX_POSTS ?>)</h3>
@@ -3119,6 +3283,7 @@ input:checked ~ .confirm-revoke { display:inline; }
                     Las casillas vacías se ignoran. Si subís un archivo y además hay un enlace, se usa el archivo subido.
                 </small>
             </form>
+            <?php endif; ?>
         </div>
 
         <hr style="border:none; border-top:1px solid var(--line); margin:0 0 36px">
