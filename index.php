@@ -63,7 +63,34 @@ $totalBanners = count($banners);
     <div class="hero-progress" aria-hidden="true"><span></span></div>
     <?php endif; ?>
 </section>
-<section class="categories"><div class="category-intro"><small>ENCONTRÁ LO QUE NECESITÁS</small><h2>Tu mundo,<br>a todo color.</h2></div><a href="<?= e(site_url('catalogo.php?categoria=textiles-para-estampar')) ?>"><span class="category-icon">♧</span><span>Textiles para estampar</span><span class="category-arrow">↗</span></a><a href="<?= e(site_url('catalogo.php?categoria=pad-gamer-pad-mouse')) ?>"><span class="category-icon">▣</span><span>Pad gamer & mouse</span><span class="category-arrow">↗</span></a><a href="<?= e(site_url('catalogo.php?categoria=accesorios-y-regalos-para-sublimar')) ?>"><span class="category-icon">☕</span><span>Regalos y accesorios</span><span class="category-arrow">↗</span></a><a href="<?= e(site_url('catalogo.php?categoria=packaging-bolsas-cajas-y-cartulina')) ?>"><span class="category-icon">▤</span><span>Packaging y bolsas</span><span class="category-arrow">↗</span></a><a href="<?= e(site_url('catalogo.php?categoria=impresoras-sublimadoras-y-consumibles')) ?>"><span class="category-icon">◉</span><span>Equipos y consumibles</span><span class="category-arrow">↗</span></a></section>
+<section class="categories">
+    <div class="category-intro"><small>ENCONTRÁ LO QUE NECESITÁS</small><h2>Tu mundo,<br>a todo color.</h2></div>
+    <a href="<?= e(site_url('catalogo.php?categoria=textiles-para-estampar')) ?>">
+        <span class="category-icon" aria-hidden="true"><svg viewBox="0 0 48 48" width="42" height="42"><path d="M18 7 7.5 12.5l4.3 9L17 19v21h14V19l5.2 2.5 4.3-9L30 7l-3 3.6h-6L18 7Z" fill="#39aef2"/><path d="M21 7h6a3 3 0 0 1-6 0Z" fill="#ed3285"/><rect x="21" y="27" width="6" height="6" rx="1.2" fill="#ffe72e"/></svg></span>
+        <span class="category-label">Textiles para estampar</span>
+        <span class="category-arrow" aria-hidden="true">↗</span>
+    </a>
+    <a href="<?= e(site_url('catalogo.php?categoria=pad-gamer-pad-mouse')) ?>">
+        <span class="category-icon" aria-hidden="true"><svg viewBox="0 0 48 48" width="42" height="42"><rect x="14" y="6" width="20" height="36" rx="10" fill="#39aef2"/><rect x="22.4" y="10" width="3.2" height="11" rx="1.6" fill="#ed3285"/><rect x="22.4" y="26" width="3.2" height="9" rx="1.6" fill="#ffffff" opacity=".85"/></svg></span>
+        <span class="category-label">Pad gamer &amp; mouse</span>
+        <span class="category-arrow" aria-hidden="true">↗</span>
+    </a>
+    <a href="<?= e(site_url('catalogo.php?categoria=accesorios-y-regalos-para-sublimar')) ?>">
+        <span class="category-icon" aria-hidden="true"><svg viewBox="0 0 48 48" width="42" height="42"><path d="M21 5c0 3-3 3-3 6s3 3 3 6" fill="none" stroke="#ffe72e" stroke-width="2.4" stroke-linecap="round"/><path d="M28 5c0 3-3 3-3 6s3 3 3 6" fill="none" stroke="#ffe72e" stroke-width="2.4" stroke-linecap="round"/><path d="M11 17h20v15a7 7 0 0 1-7 7h-6a7 7 0 0 1-7-7V17Z" fill="#ed3285"/><path d="M31 21h3a6 6 0 0 1 0 12h-3" fill="none" stroke="#ed3285" stroke-width="4"/><path d="M11 17h20" stroke="#ffffff" stroke-width="2.5" opacity=".5"/></svg></span>
+        <span class="category-label">Regalos y accesorios</span>
+        <span class="category-arrow" aria-hidden="true">↗</span>
+    </a>
+    <a href="<?= e(site_url('catalogo.php?categoria=packaging-bolsas-cajas-y-cartulina')) ?>">
+        <span class="category-icon" aria-hidden="true"><svg viewBox="0 0 48 48" width="42" height="42"><path d="M24 5 42 14v20L24 43 6 34V14L24 5Z" fill="#39aef2"/><path d="M6 14v20l18 9V23L6 14Z" fill="#2a93d0" opacity=".45"/><path d="M24 5 42 14 24 23 6 14 24 5Z" fill="#ffe72e"/><path d="M24 23v20" fill="none" stroke="#172530" stroke-width="2" opacity=".3"/></svg></span>
+        <span class="category-label">Packaging y bolsas</span>
+        <span class="category-arrow" aria-hidden="true">↗</span>
+    </a>
+    <a href="<?= e(site_url('catalogo.php?categoria=impresoras-sublimadoras-y-consumibles')) ?>">
+        <span class="category-icon" aria-hidden="true"><svg viewBox="0 0 48 48" width="42" height="42"><rect x="15" y="6" width="18" height="12" rx="1.5" fill="#172530"/><rect x="6" y="17" width="36" height="16" rx="3" fill="#39aef2"/><rect x="14" y="27" width="20" height="15" rx="1.5" fill="#ffffff"/><rect x="18" y="31" width="12" height="2.4" rx="1.2" fill="#ed3285"/><rect x="18" y="36" width="8" height="2.4" rx="1.2" fill="#ed3285"/><circle cx="37" cy="22" r="1.8" fill="#ffe72e"/></svg></span>
+        <span class="category-label">Equipos y consumibles</span>
+        <span class="category-arrow" aria-hidden="true">↗</span>
+    </a>
+</section>
 <section class="products"><div class="section-heading"><div><p class="eyebrow blue">EQUIPÁ TU PRÓXIMO PROYECTO</p><h2>Elegidos para crear.</h2></div><a href="<?= e(site_url('catalogo.php')) ?>">Ver todos los productos →</a></div><?php if (!empty($catalog['error']) && !$products): ?><p class="system-note">No pudimos cargar el catálogo ahora. Revisá la conexión con la tienda online de Hostinger.</p><?php elseif (!$products): ?><p>Próximamente vas a encontrar nuestros productos en el catálogo.</p><?php else: ?><div class="product-grid"><?php foreach (array_slice($products, 0, 4) as $p) render_product_card($p); ?></div><?php endif; ?></section>
 <section class="story" id="nosotros"><div class="story-image"><img loading="lazy" src="https://alpha-color.ancorathemes.com/wp-content/uploads/2017/04/image-30.jpg" alt="Colores y herramientas para impresión"><span>Más que insumos.<br><b>Un aliado para tu negocio.</b></span></div><div><p class="eyebrow blue">CREAMOS CON VOS</p><h2>Vos ponés la idea.<br>Nosotros, el color.</h2><p>Acompañamos a emprendedores, talleres y negocios con insumos y equipos para sublimación y estampado. Encontrá lo que necesitás para dar el siguiente paso.</p><ul><li>✓ Atención personalizada</li><li>✓ Compras mayoristas con revisión de stock</li><li>✓ Asesoramiento para elegir tu equipo</li></ul><a href="<?= e(whatsapp_url('Hola, quisiera asesoramiento para mi proyecto de sublimación.')) ?>" target="_blank" rel="noopener noreferrer" class="btn yellow">Hablemos de tu proyecto →</a></div></section>
 <section class="wholesale" id="mayoristas"><div><p class="eyebrow">PENSADO PARA TU NEGOCIO</p><h2>Comprar al por mayor,<br>sin complicaciones.</h2><a class="btn yellow" href="<?= e(site_url('cuenta.php?registro=1')) ?>">Solicitar cuenta mayorista →</a></div><ol><li><b>01</b><div><h3>Registrá tu negocio</h3><p>Completá tus datos. Revisamos y aprobamos tu cuenta manualmente.</p></div></li><li><b>02</b><div><h3>Armá tu pedido</h3><p>Accedé a precios mayoristas y enviá tu pedido con el pago coordinado.</p></div></li><li><b>03</b><div><h3>Confirmamos y coordinamos</h3><p>Verificamos stock antes del pago. Cuando habilitemos tu pedido, podrás adjuntar el comprobante en tu cuenta.</p></div></li></ol></section>

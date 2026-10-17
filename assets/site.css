@@ -981,3 +981,70 @@ html { overflow-x: clip; }
     .hero .hero-nav { gap: 12px; }
     .hero .hero-photo { border-radius: 12px; }
 }
+
+
+/* ==========================================================================
+   ANCHO COMPLETO + CATEGORIAS CON ICONOS (estilo "servicios")
+   (al final a proposito: gana en cascada sobre las reglas de arriba)
+   ========================================================================== */
+
+/* Hero a todo el ancho: sin franjas blancas a los costados */
+.hero {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    border-radius: 0 !important;
+}
+
+/* Banda de categorias: fondo oscuro para que resalten los iconos a color */
+.categories {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    background: var(--ink);
+}
+
+.category-intro { background: transparent; }
+
+.categories > a {
+    color: #fff;
+    background: transparent;
+    transition: background .25s ease;
+}
+
+.categories > a:hover { background: rgba(255, 255, 255, .06); }
+
+.categories .category-icon {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    font-size: 0;
+    line-height: 0;
+    transition: transform .3s cubic-bezier(.22,.61,.36,1);
+}
+
+.categories > a:hover .category-icon { transform: translateY(-4px) scale(1.07); }
+.categories .category-icon svg { display: block; width: 42px; height: 42px; }
+.categories .category-label { display: block; font-weight: 600; }
+
+.categories .category-arrow { color: #8b97a1; transition: color .2s ease, transform .2s ease; }
+.categories > a:hover .category-arrow { color: #fff; transform: translate(2px, -2px); }
+
+/* Linea inferior de cada categoria: alterna la paleta de la marca */
+.categories > a:nth-child(2) { border-bottom-color: var(--blue); }
+.categories > a:nth-child(3) { border-bottom-color: var(--pink); }
+.categories > a:nth-child(4) { border-bottom-color: var(--yellow); }
+.categories > a:nth-child(5) { border-bottom-color: var(--blue); }
+.categories > a:nth-child(6) { border-bottom-color: var(--pink); }
+
+/* En celular (1 columna) las filas van en linea: icono a la izquierda */
+@media (max-width: 480px) {
+    .categories > a {
+        flex-direction: row;
+        justify-content: center;
+        gap: 14px;
+        padding: 18px 20px;
+    }
+
+    .categories .category-icon { width: 44px; height: 44px; }
+    .categories .category-icon svg { width: 36px; height: 36px; }
+}
