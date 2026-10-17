@@ -1048,3 +1048,62 @@ html { overflow-x: clip; }
     .categories .category-icon { width: 44px; height: 44px; }
     .categories .category-icon svg { width: 36px; height: 36px; }
 }
+
+
+/* ==========================================================================
+   BOTON "VOLVER ARRIBA" (parejo con el de WhatsApp) + banner del catalogo
+   ancho completo como el hero
+   ========================================================================== */
+
+.to-top {
+    position: fixed;
+    right: 24px;
+    bottom: 94px; /* 24 (abajo de WhatsApp) + 58 (alto) + 12 (separacion) */
+    width: 58px;
+    height: 58px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ink);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    z-index: 20;
+    box-shadow: 0 5px 20px #15253025;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: opacity .25s ease, transform .25s ease, background .18s ease, color .18s ease, visibility .25s ease;
+}
+
+.to-top.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+}
+
+.to-top:hover {
+    background: var(--blue);
+    color: #fff;
+}
+
+.to-top svg { width: 24px; height: 24px; display: block; }
+
+/* Banner del catalogo: a todo el ancho, igual que el hero de la home */
+.shop-banner {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    border-radius: 0 !important;
+}
+
+/* En tablet/celular achico el boton junto con el de WhatsApp para que queden parejos */
+@media (max-width: 768px) {
+    .to-top {
+        width: 50px !important;
+        height: 50px !important;
+        right: 18px !important;
+        bottom: 80px !important; /* 20 + 50 + 10 */
+    }
+
+    .to-top svg { width: 21px !important; height: 21px !important; }
+}
