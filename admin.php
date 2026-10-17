@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/lib_inventario.php';
 require_staff();
 
 /* ── Procesar POST ───────────────────────────────────────────────────── */
@@ -26,6 +27,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'delete_api_product'   => 'productos',
             'restore_api_product'  => 'productos',
             'sync_csv_catalog'     => 'productos',
+            'save_category'        => 'productos',
+            'delete_category'      => 'productos',
+            'import_inventory_excel' => 'productos',
             'create_banner'        => 'banners',
             'edit_banner'          => 'banners',
             'delete_banner'        => 'banners',
@@ -122,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'price'           => trim((string)($_POST['price'] ?? '')),
                 'currency_symbol' => trim((string)($_POST['currency_symbol'] ?? '$')),
                 'category'        => trim((string)($_POST['category'] ?? '')),
-                'category_slug'   => trim((string)($_POST['category_slug'] ?? '')),
+                'category_slug'   => inv_resolve_category_slug((string)($_POST['category'] ?? ''), (string)($_POST['category_slug'] ?? '')),
                 'sku'             => trim((string)($_POST['sku'] ?? '')),
                 'unit_of_sale'    => trim((string)($_POST['unit_of_sale'] ?? 'unidad')),
                 'pack_quantity'   => trim((string)($_POST['pack_quantity'] ?? '')),
@@ -162,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'price'           => trim((string)($_POST['price'] ?? '')),
                 'currency_symbol' => trim((string)($_POST['currency_symbol'] ?? '$')),
                 'category'        => trim((string)($_POST['category'] ?? '')),
-                'category_slug'   => trim((string)($_POST['category_slug'] ?? '')),
+                'category_slug'   => inv_resolve_category_slug((string)($_POST['category'] ?? ''), (string)($_POST['category_slug'] ?? '')),
                 'sku'             => trim((string)($_POST['sku'] ?? '')),
                 'unit_of_sale'    => trim((string)($_POST['unit_of_sale'] ?? 'unidad')),
                 'pack_quantity'   => trim((string)($_POST['pack_quantity'] ?? '')),
@@ -188,6 +192,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $handle = trim((string)($_POST['api_handle'] ?? ''));
             restore_api_product($handle);
             set_flash('success', 'Producto restaurado al catálogo.');
+
+        } elseif ($act === 'save_category') {
+            $catId = (int)($_POST['category_id'] ?? 0);
+            $res   = inv_save_category([
+                'id'         => $catId,
+                'name'       => (string)($_POST['name'] ?? ''),
+                'slug'       => (string)($_POST['slug'] ?? ''),
+                'sort_order' => (int)($_POST['sort_order'] ?? 0),
+                'active'     => (isset($_POST['active']) && $_POST['active'] === '1') ? 1 : 0,
+                'source_url' => (string)($_POST['source_url'] ?? ''),
+            ]);
+            $msg = $catId > 0 ? 'Categoría actualizada.' : 'Categoría creada.';
+            if ($res['products_updated'] > 0) {
+                $msg .= ' Se acompasaron ' . $res['products_updated'] . ' producto(s) que la usaban.';
+            }
+            set_flash('success', $msg);
+
+        } elseif ($act === 'delete_category') {
+            $cat = inv_delete_category((int)($_POST['category_id'] ?? 0));
+            set_flash('success', 'Categoría "' . $cat['name'] . '" eliminada.');
+
+        } elseif ($act === 'import_inventory_excel') {
+            $file = $_FILES['excel_file'] ?? null;
+            if (!is_array($file) || (int)($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                throw new RuntimeException('Elegí el archivo Excel (.xlsx) que querés cargar.');
+            }
+            if ((int)$file['size'] > 8 * 1024 * 1024) {
+                throw new RuntimeException('El archivo no debe superar los 8 MB.');
+            }
+            $rows   = inv_read_upload((string)$file['tmp_name'], (string)$file['name']);
+            $create = isset($_POST['crear_nuevos']) && $_POST['crear_nuevos'] === '1';
+            $report = inv_apply_import($rows, $create, (string)$file['name']);
+            inv_save_report($report);
+
+            $s = $report['stats'];
+            $msg = 'Excel aplicado: ' . $s['updated'] . ' producto(s) actualizado(s), '
+                 . $s['created'] . ' nuevo(s), ' . $s['unchanged'] . ' sin cambios';
+            if ($s['ignored'] > 0) $msg .= ', ' . $s['ignored'] . ' omitido(s)';
+            $msg .= '.';
+            if ($report['notes']) $msg .= ' Revisá los avisos en "Qué cambió el último Excel".';
+            set_flash('success', $msg);
 
         } elseif ($act === 'create_banner') {
             $imageUrl = trim((string)($_POST['image_url'] ?? ''));
@@ -509,7 +554,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         /* Volver a la vista de detalle de ese pedido (no al listado) */
         $extra = '&ver=' . (int)$_POST['_order_id'];
     }
+    if (!empty($_POST['_sec'])) {
+        /* Volver a la sub-pestaña de la que salió el formulario */
+        $extra .= '&sec=' . urlencode((string)$_POST['_sec']);
+    }
     redirect('admin.php?tab=' . urlencode($tab) . $extra);
+}
+
+/* ── Descarga de la planilla de inventario (Excel) ───────────────────── */
+if (($_GET['descargar'] ?? '') === 'excel' && can('productos')) {
+    $tmp = '';
+    try {
+        /* Carpeta temporal: la del sistema y, si no se puede escribir, la de subidas. */
+        $dir = (string)sys_get_temp_dir();
+        if ($dir === '' || !is_dir($dir) || !is_writable($dir)) {
+            $dir = __DIR__ . '/uploads';
+        }
+        $tmp = (string)tempnam($dir, 'invxlsx');
+        if ($tmp === '' || !is_file($tmp)) {
+            throw new RuntimeException('el servidor no tiene una carpeta temporal escribible.');
+        }
+        xlsx_write($tmp, inv_export_sheets());
+        $name = 'Serinsumos-inventario-' . date('Y-m-d') . '.xlsx';
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $name . '"');
+        header('Content-Length: ' . filesize($tmp));
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+        readfile($tmp);
+        @unlink($tmp);
+    } catch (Throwable $ex) {
+        if ($tmp !== '') @unlink($tmp);
+        set_flash('error', 'No se pudo generar el Excel: ' . $ex->getMessage());
+        redirect('admin.php?tab=productos&sec=excel');
+    }
+    exit;
 }
 
 /* ── Pestaña activa (solo las permitidas al usuario) ─────────────────── */
@@ -1567,6 +1647,9 @@ input:checked ~ .confirm-revoke { display:inline; }
     <?php elseif ($tab === 'productos'): ?>
 
         <?php
+        $sec = (string)($_GET['sec'] ?? 'productos');
+        if (!in_array($sec, ['productos', 'categorias', 'excel'], true)) $sec = 'productos';
+
         $total_prods      = count($adminProducts);
         $visibles_prods   = count(array_filter($adminProducts, fn($p) => !empty($p['_visible']) && empty($p['_deleted'])));
         $ocultos_prods    = count(array_filter($adminProducts, fn($p) => empty($p['_visible']) && empty($p['_deleted'])));
@@ -1580,16 +1663,78 @@ input:checked ~ .confirm-revoke { display:inline; }
             array_map(fn($p) => (string)($p['_category'] ?? ''), $adminProducts)
         )));
         sort($existingCategories);
+
+        $invLocalCount = (int)db()->query('SELECT COUNT(*) FROM local_products')->fetchColumn();
         ?>
+
+        <style>
+        /* ── Sub-pestañas dentro de Productos ────────────────────────── */
+        .prod-subtabs { display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 14px; margin-bottom: 24px; }
+        .prod-subtabs a { padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: var(--gray); background: #f3f5f7; }
+        .prod-subtabs a:hover { color: var(--ink); background: #eaeef2; }
+        .prod-subtabs a.active { background: var(--blue); color: #fff; }
+
+        /* ── Categorías ──────────────────────────────────────────────── */
+        .cat-name  { font-weight: 600; font-size: 13.5px; }
+        .cat-count { font-size: 12px; color: var(--gray); }
+        .cat-count b { color: var(--ink); }
+        .cat-off   { opacity: .55; }
+
+        /* ── Excel ───────────────────────────────────────────────────── */
+        .excel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+        .excel-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; }
+        .excel-card h3 { margin: 0 0 8px; font-size: 16px; }
+        .excel-card p  { margin: 0 0 16px; color: var(--gray); font-size: 13.5px; line-height: 1.6; }
+        .excel-card ol { margin: 0 0 16px 18px; padding: 0; color: var(--gray); font-size: 13.5px; line-height: 1.75; }
+        .excel-card code { background: #f3f5f7; padding: 1px 6px; border-radius: 4px; font-size: 12.5px; }
+        .excel-old { color: var(--gray); text-decoration: line-through; }
+        .excel-new { color: #0d7a4a; font-weight: 600; }
+        .excel-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 700; }
+        .excel-badge.up  { background: #e6f7ee; color: #0d7a4a; }
+        .excel-badge.new { background: #e8f2ff; color: #1f6fd0; }
+        .excel-badge.same{ background: #f0f2f5; color: #6b7a87; }
+        .excel-badge.off { background: #fdeef2; color: #b3164a; }
+        @media(max-width: 900px) { .excel-grid { grid-template-columns: 1fr; } }
+
+        /* ── Tabla y formularios de productos (compartidos) ──────────── */
+        .prod-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .prod-table th { text-align: left; padding: 10px 10px; border-bottom: 2px solid var(--line); font-size: 11px; letter-spacing: .8px; color: var(--gray); font-weight: 600; }
+        .prod-table td { padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+        .prod-table tr:last-child td { border-bottom: none; }
+        .prod-table .prod-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; background: #f3f5f7; display: block; }
+        .prod-table .prod-thumb-placeholder { width: 48px; height: 48px; background: #f3f5f7; border-radius: 4px; display: grid; place-items: center; color: var(--gray); font-size: 20px; }
+        .prod-edit-form { display: none; }
+        .prod-edit-form.open { display: block; }
+        .prod-edit-panel { background: #f8f9fb; border: 1px solid var(--line); border-radius: 8px; padding: 20px; margin: 10px 0 16px; }
+        .prod-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
+        .prod-edit-grid label { margin-bottom: 0; }
+        .prod-edit-grid label input, .prod-edit-grid label select { width: 100%; }
+        .prod-edit-notes { grid-column: 1 / -1; }
+        .prod-edit-notes textarea { width: 100%; min-height: 70px; }
+        .prod-edit-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+        .prod-visibility-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 10px 14px; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
+        .prod-visibility-row label { flex-direction: row; align-items: center; gap: 8px; margin: 0; font-weight: 600; font-size: 13px; }
+        .prod-api-price { font-size: 11px; color: var(--gray); margin-top: 3px; }
+
+        /* Filtros rápidos */
+        .prod-filter-bar { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 18px; }
+        .prod-filter-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+        .prod-filter-pill { border: 1px solid var(--line); background: #fff; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--gray); }
+        .prod-filter-pill.active { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
+        .prod-search-box { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 250px; }
+        .prod-search-box input { padding: 8px 12px; font-size: 13px; width: 100%; }
+        @media(max-width:700px) { .prod-edit-grid { grid-template-columns: 1fr; } .prod-search-box { width: 100%; } }
+        </style>
 
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px">
             <div>
                 <h2>Gestión de productos</h2>
                 <p style="margin:0;color:var(--gray);font-size:14px">
-                    Administrá tus productos, precios, stock y visibilidad en la tienda.
+                    Administrá tus productos, precios, categorías y visibilidad en la tienda.
                     Los precios solo son visibles para clientes mayoristas verificados.
                 </p>
             </div>
+            <?php if ($sec === 'productos'): ?>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                 <form method="post" style="display:inline;margin:0" onsubmit="return confirm('¿Sincronizar el catálogo desde los archivos CSV (12 categorías y 154 productos)?')">
                     <?= csrf_field() ?>
@@ -1603,7 +1748,16 @@ input:checked ~ .confirm-revoke { display:inline; }
                     + Agregar nuevo producto
                 </button>
             </div>
+            <?php endif; ?>
         </div>
+
+        <nav class="prod-subtabs">
+            <a href="admin.php?tab=productos" class="<?= $sec === 'productos' ? 'active' : '' ?>">📦 Productos</a>
+            <a href="admin.php?tab=productos&amp;sec=categorias" class="<?= $sec === 'categorias' ? 'active' : '' ?>">🏷️ Categorías (<?= count($dbCats) ?>)</a>
+            <a href="admin.php?tab=productos&amp;sec=excel" class="<?= $sec === 'excel' ? 'active' : '' ?>">📊 Excel</a>
+        </nav>
+
+        <?php if ($sec === 'productos'): ?>
 
         <?php if ($adminCatalogError): ?>
             <div class="app-flash error" role="alert" style="margin-bottom:20px">
@@ -1714,37 +1868,6 @@ input:checked ~ .confirm-revoke { display:inline; }
                 </div>
             </form>
         </div>
-
-        <style>
-        /* ── Estilos de la tabla de productos ───────────────────────── */
-        .prod-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .prod-table th { text-align: left; padding: 10px 10px; border-bottom: 2px solid var(--line); font-size: 11px; letter-spacing: .8px; color: var(--gray); font-weight: 600; }
-        .prod-table td { padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-        .prod-table tr:last-child td { border-bottom: none; }
-        .prod-table .prod-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; background: #f3f5f7; display: block; }
-        .prod-table .prod-thumb-placeholder { width: 48px; height: 48px; background: #f3f5f7; border-radius: 4px; display: grid; place-items: center; color: var(--gray); font-size: 20px; }
-        .prod-edit-form { display: none; }
-        .prod-edit-form.open { display: block; }
-        .prod-edit-panel { background: #f8f9fb; border: 1px solid var(--line); border-radius: 8px; padding: 20px; margin: 10px 0 16px; }
-        .prod-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
-        .prod-edit-grid label { margin-bottom: 0; }
-        .prod-edit-grid label input, .prod-edit-grid label select { width: 100%; }
-        .prod-edit-notes { grid-column: 1 / -1; }
-        .prod-edit-notes textarea { width: 100%; min-height: 70px; }
-        .prod-edit-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
-        .prod-visibility-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 10px 14px; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
-        .prod-visibility-row label { flex-direction: row; align-items: center; gap: 8px; margin: 0; font-weight: 600; font-size: 13px; }
-        .prod-api-price { font-size: 11px; color: var(--gray); margin-top: 3px; }
-
-        /* Filtros rápidos */
-        .prod-filter-bar { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 18px; }
-        .prod-filter-pills { display: flex; gap: 6px; flex-wrap: wrap; }
-        .prod-filter-pill { border: 1px solid var(--line); background: #fff; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--gray); }
-        .prod-filter-pill.active { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
-        .prod-search-box { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 250px; }
-        .prod-search-box input { padding: 8px 12px; font-size: 13px; width: 100%; }
-        @media(max-width:700px) { .prod-edit-grid { grid-template-columns: 1fr; } .prod-search-box { width: 100%; } }
-        </style>
 
         <!-- ── Barra de búsqueda y filtros ──────────────────────────────── -->
         <div class="prod-filter-bar">
@@ -2181,6 +2304,361 @@ input:checked ~ .confirm-revoke { display:inline; }
         </script>
 
         <?php endif; // end $adminProducts ?>
+
+        <?php elseif ($sec === 'categorias'): ?>
+
+        <?php
+        $sinCategoria = (int)db()->query("SELECT COUNT(*) FROM local_products WHERE category='' OR category IS NULL")->fetchColumn();
+        ?>
+
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px">
+            <p style="margin:0;max-width:680px;color:var(--gray);font-size:14px;line-height:1.6">
+                Estas son las categorías que usan el catálogo y el buscador de inventario. Podés ordenarlas,
+                activarlas o desactivarlas, cambiarles el nombre y eliminarlas. Si renombrás una categoría,
+                los productos que la usaban se actualizan solos.
+            </p>
+            <button class="btn yellow" type="button" onclick="toggleCatPanel()" style="white-space:nowrap">+ Nueva categoría</button>
+        </div>
+
+        <?php if ($sinCategoria > 0): ?>
+            <p style="margin:0 0 16px;font-size:13px;color:var(--gray)">
+                ⚠️ Hay <b><?= $sinCategoria ?></b> producto(s) sin categoría asignada.
+            </p>
+        <?php endif; ?>
+
+        <div id="panel-nueva-categoria" style="display:none;background:#f8f9fb;border:2px solid var(--blue);border-radius:10px;padding:24px;margin-bottom:26px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h3 style="margin:0;font-size:18px">➕ Nueva categoría</h3>
+                <button class="btn outline btn-small" type="button" onclick="toggleCatPanel()" style="margin:0">Cerrar ✕</button>
+            </div>
+            <form method="post">
+                <?= csrf_field() ?>
+                <input type="hidden" name="act"  value="save_category">
+                <input type="hidden" name="_tab" value="productos">
+                <input type="hidden" name="_sec" value="categorias">
+                <div class="prod-edit-grid">
+                    <label>Nombre visible *
+                        <input name="name" type="text" required maxlength="160" placeholder="Ej: Vinilos y transfer">
+                    </label>
+                    <label>Slug (para el enlace)
+                        <input name="slug" type="text" maxlength="120" placeholder="Se genera solo si lo dejás vacío">
+                    </label>
+                    <label>Orden en el catálogo
+                        <input name="sort_order" type="number" value="<?= (count($dbCats) + 1) ?>">
+                        <small style="color:var(--gray);font-size:11px">Menor número aparece primero.</small>
+                    </label>
+                    <label>Enlace de referencia (opcional)
+                        <input name="source_url" type="url" placeholder="https://...">
+                    </label>
+                </div>
+                <div class="prod-visibility-row" style="margin-top:14px">
+                    <label>
+                        <input type="checkbox" name="active" value="1" checked>
+                        Activa: se muestra en el catálogo
+                    </label>
+                </div>
+                <div class="prod-edit-actions" style="margin-top:16px">
+                    <button class="btn yellow" type="submit">Guardar categoría</button>
+                    <button class="btn outline" type="button" onclick="toggleCatPanel()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+
+        <div style="overflow-x:auto">
+        <table class="prod-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Slug</th>
+                    <th style="text-align:center">Orden</th>
+                    <th>Productos</th>
+                    <th>Estado</th>
+                    <th style="text-align:right">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php if (!$dbCats): ?>
+                <tr><td colspan="6" style="color:var(--gray)">Todavía no hay categorías cargadas.</td></tr>
+            <?php endif; ?>
+
+            <?php foreach ($dbCats as $c):
+                $cId   = (int)$c['id'];
+                $cName = (string)$c['name'];
+                $cSlug = (string)$c['slug'];
+                $cUsed = inv_category_products($cSlug, $cName);
+            ?>
+                <tr class="<?= (int)$c['active'] === 1 ? '' : 'cat-off' ?>">
+                    <td class="cat-name"><?= e($cName) ?></td>
+                    <td><code style="font-size:12px;color:var(--gray)"><?= e($cSlug) ?></code></td>
+                    <td style="text-align:center"><?= (int)$c['sort_order'] ?></td>
+                    <td class="cat-count">
+                        <?php if ($cUsed > 0): ?>
+                            <b><?= $cUsed ?></b> producto<?= $cUsed === 1 ? '' : 's' ?>
+                        <?php else: ?>
+                            Sin productos
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ((int)$c['active'] === 1): ?>
+                            <span class="badge badge-green">Activa</span>
+                        <?php else: ?>
+                            <span class="badge badge-gray">Inactiva</span>
+                        <?php endif; ?>
+                    </td>
+                    <td style="text-align:right;white-space:nowrap">
+                        <div style="display:inline-flex;gap:6px;align-items:center">
+                            <button class="btn outline btn-small" type="button" onclick="toggleCatEdit(<?= $cId ?>)" style="margin:0">Editar</button>
+                            <form method="post" style="display:inline;margin:0"
+                                  onsubmit="return confirm('¿Eliminar la categoría <?= addslashes($cName) ?>?')">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="act"         value="delete_category">
+                                <input type="hidden" name="_tab"        value="productos">
+                                <input type="hidden" name="_sec"        value="categorias">
+                                <input type="hidden" name="category_id" value="<?= $cId ?>">
+                                <button class="btn outline btn-small" type="submit"
+                                        style="margin:0;color:var(--pink);border-color:var(--pink)">Eliminar</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <tr id="edit-cat-row-<?= $cId ?>">
+                    <td colspan="6" style="padding:0;border-bottom:2px solid var(--line)">
+                        <div class="prod-edit-form" id="edit-cat-<?= $cId ?>">
+                            <div class="prod-edit-panel">
+                                <form method="post">
+                                    <?= csrf_field() ?>
+                                    <input type="hidden" name="act"         value="save_category">
+                                    <input type="hidden" name="_tab"        value="productos">
+                                    <input type="hidden" name="_sec"        value="categorias">
+                                    <input type="hidden" name="category_id" value="<?= $cId ?>">
+
+                                    <div class="prod-edit-grid">
+                                        <label>Nombre visible *
+                                            <input name="name" type="text" required maxlength="160" value="<?= e($cName) ?>">
+                                        </label>
+                                        <label>Slug (para el enlace)
+                                            <input name="slug" type="text" maxlength="120" value="<?= e($cSlug) ?>">
+                                        </label>
+                                        <label>Orden en el catálogo
+                                            <input name="sort_order" type="number" value="<?= (int)$c['sort_order'] ?>">
+                                        </label>
+                                        <label>Enlace de referencia (opcional)
+                                            <input name="source_url" type="url" value="<?= e((string)$c['source_url']) ?>">
+                                        </label>
+                                    </div>
+
+                                    <div class="prod-visibility-row" style="margin-top:14px">
+                                        <label>
+                                            <input type="checkbox" name="active" value="1" <?= (int)$c['active'] === 1 ? 'checked' : '' ?>>
+                                            Activa: se muestra en el catálogo
+                                        </label>
+                                        <span style="font-size:12px;color:var(--gray)">
+                                            <?= $cUsed ?> producto(s) usan esta categoría.
+                                        </span>
+                                    </div>
+
+                                    <div class="prod-edit-actions">
+                                        <button class="btn yellow btn-small" type="submit">Guardar cambios</button>
+                                        <button class="btn outline btn-small" type="button" onclick="toggleCatEdit(<?= $cId ?>)">Cancelar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        </div>
+
+        <script>
+        function toggleCatPanel() {
+            const p = document.getElementById('panel-nueva-categoria');
+            if (!p) return;
+            p.style.display = p.style.display === 'none' ? 'block' : 'none';
+            if (p.style.display === 'block') p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        function toggleCatEdit(id) {
+            const el = document.getElementById('edit-cat-' + id);
+            if (el) el.classList.toggle('open');
+        }
+        </script>
+
+        <?php else: /* ── Excel ── */ ?>
+
+        <?php
+        $invReport  = inv_last_report();
+        $repStats   = $invReport['stats'] ?? [];
+        $repChanges = $invReport['changes'] ?? [];
+        $repCreated = $invReport['created'] ?? [];
+        $repNotes   = $invReport['notes'] ?? [];
+        ?>
+
+        <div class="excel-grid">
+            <div class="excel-card">
+                <h3>1️⃣ Descargar la planilla</h3>
+                <p>
+                    Baja un Excel con <b>los <?= $invLocalCount ?> productos locales</b> del inventario y su estado actual
+                    (SKU, nombre, categoría, precio y si está visible).
+                </p>
+                <a class="btn yellow" href="admin.php?tab=productos&amp;sec=excel&amp;descargar=excel">⬇️ Descargar Excel (.xlsx)</a>
+                <p style="margin:14px 0 0;font-size:12.5px">
+                    La planilla incluye una segunda hoja <code>Categorias</code> solo de referencia.
+                    Los productos que vienen de la tienda de Hostinger no entran en la planilla.
+                </p>
+            </div>
+
+            <div class="excel-card">
+                <h3>2️⃣ Editar y volver a subir</h3>
+                <p>
+                    Cambiá lo que necesites en la planilla (precios, nombres, categorías o visibilidad) y subila.
+                    <b>Solo se aplican los cambios detectados</b>: lo que quede igual no se toca.
+                </p>
+                <form method="post" enctype="multipart/form-data">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="act"  value="import_inventory_excel">
+                    <input type="hidden" name="_tab" value="productos">
+                    <input type="hidden" name="_sec" value="excel">
+                    <label>Archivo Excel (.xlsx)
+                        <input name="excel_file" type="file" accept=".xlsx,.csv" required
+                               aria-label="Elegí la planilla de inventario para subir">
+                    </label>
+                    <div class="prod-visibility-row" style="margin:14px 0">
+                        <label>
+                            <input type="checkbox" name="crear_nuevos" value="1" checked>
+                            Crear los productos que no existan
+                        </label>
+                        <span style="font-size:12px;color:var(--gray)">
+                            Si lo destildás, las filas nuevas se omiten y quedan avisadas en el reporte.
+                        </span>
+                    </div>
+                    <button class="btn yellow" type="submit">⬆️ Aplicar cambios al inventario</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="excel-card" style="margin-top:18px">
+            <h3>3️⃣ Qué cambió el último Excel</h3>
+            <?php if (!$invReport): ?>
+                <p style="margin-bottom:0">Todavía no cargaste ninguna planilla desde el panel.</p>
+            <?php else: ?>
+                <p>
+                    Última carga: <b><?= e((string)($invReport['at'] ?? '')) ?></b>
+                    · archivo <code><?= e((string)($invReport['file'] ?? '')) ?></code>
+                    <?php if (!empty($invReport['user'])): ?>· por <?= e((string)$invReport['user']) ?><?php endif; ?>
+                </p>
+                <p>
+                    <span class="excel-badge up"><?= (int)($repStats['updated'] ?? 0) ?> actualizado(s)</span>
+                    <span class="excel-badge new"><?= (int)($repStats['created'] ?? 0) ?> nuevo(s)</span>
+                    <span class="excel-badge same"><?= (int)($repStats['unchanged'] ?? 0) ?> sin cambios</span>
+                    <?php if ((int)($repStats['ignored'] ?? 0) > 0): ?>
+                        <span class="excel-badge off"><?= (int)$repStats['ignored'] ?> omitido(s)</span>
+                    <?php endif; ?>
+                </p>
+                <button class="btn outline" type="button" onclick="toggleUltimoExcel()" id="btn-ultimo-excel">
+                    🔍 Ver qué cambió el último Excel
+                </button>
+
+                <div id="ultimo-excel" style="display:none;margin-top:20px">
+                    <?php if ($repChanges): ?>
+                        <div style="overflow-x:auto">
+                        <table class="prod-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:44px">Fila</th>
+                                    <th>Producto</th>
+                                    <th>Cambios</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($repChanges as $ch): ?>
+                                <tr>
+                                    <td style="color:var(--gray);font-size:12px"><?= (int)($ch['row'] ?? 0) ?></td>
+                                    <td>
+                                        <b style="font-size:13px"><?= e((string)($ch['title'] ?? '')) ?></b>
+                                        <?php if (!empty($ch['sku'])): ?>
+                                            <div style="font-size:11px;color:var(--gray);font-family:monospace"><?= e((string)$ch['sku']) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php foreach (($ch['fields'] ?? []) as $f): ?>
+                                            <div style="font-size:12.5px;margin-bottom:2px">
+                                                <b><?= e((string)($f['label'] ?? '')) ?>:</b>
+                                                <span class="excel-old"><?= e((string)($f['old'] ?? '')) ?></span>
+                                                →
+                                                <span class="excel-new"><?= e((string)($f['new'] ?? '')) ?></span>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        </div>
+                    <?php else: ?>
+                        <p style="color:var(--gray)">No hubo cambios en los productos que ya existían.</p>
+                    <?php endif; ?>
+
+                    <?php if ($repCreated): ?>
+                        <h4 style="margin:22px 0 10px;font-size:14px">Productos nuevos creados</h4>
+                        <div style="overflow-x:auto">
+                        <table class="prod-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:44px">Fila</th>
+                                    <th>SKU</th>
+                                    <th>Nombre</th>
+                                    <th>Categoría</th>
+                                    <th>Precio</th>
+                                    <th style="text-align:center">Visible</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($repCreated as $nw): ?>
+                                <tr>
+                                    <td style="color:var(--gray);font-size:12px"><?= (int)($nw['row'] ?? 0) ?></td>
+                                    <td style="font-family:monospace;font-size:12px"><?= e((string)($nw['sku'] ?? '')) ?></td>
+                                    <td><b style="font-size:13px"><?= e((string)($nw['title'] ?? '')) ?></b></td>
+                                    <td style="font-size:12.5px"><?= e((string)($nw['category'] ?? '')) ?: '<span style="color:var(--gray)">—</span>' ?></td>
+                                    <td style="font-size:12.5px"><?= e((string)($nw['price'] ?? '')) ?></td>
+                                    <td style="text-align:center;font-size:12.5px"><?= e((string)($nw['visible'] ?? '')) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($repNotes): ?>
+                        <h4 style="margin:22px 0 10px;font-size:14px">Avisos</h4>
+                        <ul style="margin:0;padding-left:20px;color:var(--gray);font-size:13px;line-height:1.7">
+                            <?php foreach ($repNotes as $note): ?>
+                                <li><?= e((string)$note) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+
+                    <?php if (!empty($invReport['truncated'])): ?>
+                        <p style="margin:16px 0 0;font-size:12.5px;color:var(--gray)">
+                            El detalle se recortó por tamaño; en la planilla hubo más cambios que los listados acá.
+                        </p>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <script>
+        function toggleUltimoExcel() {
+            const box = document.getElementById('ultimo-excel');
+            const btn = document.getElementById('btn-ultimo-excel');
+            if (!box) return;
+            const abierto = box.style.display !== 'none';
+            box.style.display = abierto ? 'none' : 'block';
+            if (btn) btn.textContent = abierto ? '🔍 Ver qué cambió el último Excel' : '🙈 Ocultar el detalle';
+        }
+        </script>
+
+        <?php endif; ?>
 
     <!-- ══════════════════════════════════════════════════════════════════
          PESTAÑA: BANNERS
