@@ -1144,7 +1144,7 @@ input:checked ~ .confirm-revoke { display:inline; }
         .prod-filter-pills { display: flex; gap: 6px; flex-wrap: wrap; }
         .prod-filter-pill { border: 1px solid var(--line); background: #fff; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--gray); }
         .prod-filter-pill.active { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
-        .prod-search-box { display: flex; align-items: center; gap: 8px; min-width: 250px; }
+        .prod-search-box { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 250px; }
         .prod-search-box input { padding: 8px 12px; font-size: 13px; width: 100%; }
         @media(max-width:700px) { .prod-edit-grid { grid-template-columns: 1fr; } .prod-search-box { width: 100%; } }
         </style>
