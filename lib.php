@@ -719,7 +719,7 @@ function site_header(string $title = '', string $description = ''): void {
     <meta name="theme-color" content="#172530">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.0">
+    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.1">
     <link rel="icon" href="<?= e($favicon) ?>">
     <link rel="shortcut icon" href="<?= e($favicon) ?>">
 </head>

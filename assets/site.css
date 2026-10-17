@@ -46,31 +46,10 @@ img, video, iframe, embed, object { max-width: 100%; height: auto; }
     h1, h2, h3 { overflow-wrap: break-word; word-break: break-word; }
     input, select, textarea { max-width: 100%; }
     .cart-table, .order-items-table, .prod-table { min-width: 0; }
-
-    /* Imagenes de productos: ajuste en movil */
-    .pc-thumb-wrap,
-    .pc-thumb-wrap .shop-thumb,
-    .pc-thumb-wrap .shop-thumb img,
-    .home-product-card .product-image,
-    .home-product-card .product-image img,
-    .product-image,
-    .product-image img {
-        max-width: 100% !important;
-    }
-    .pc-thumb-wrap { aspect-ratio: 16 / 9 !important; }
-    .pc-thumb-wrap .shop-thumb img { aspect-ratio: 16 / 9 !important; height: 100% !important; }
-    .home-product-card .product-image { aspect-ratio: 4 / 3 !important; }
-    .product-image { aspect-ratio: 4 / 3 !important; }
-    .product-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
 }
 
-@media (max-width: 480px) {
-    .pc-thumb-wrap { aspect-ratio: 4 / 3 !important; }
-    .pc-thumb-wrap .shop-thumb img { aspect-ratio: 4 / 3 !important; }
-    .product-grid { grid-template-columns: 1fr !important; }
-    .shop-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
-}
-
+/* Catalogo en vista LISTA: el ajuste definitivo esta al final del archivo
+   (bloque "AJUSTES FINALES RESPONSIVE"). Aqui solo ajustes generales. */
 @media (max-width: 480px) {
     .hero-buttons { flex-direction: column; align-items: stretch; }
     .hero-buttons .btn, .hero-buttons .hero-secondary { width: 100%; justify-content: center; }
@@ -701,5 +680,92 @@ body{min-height:100vh}body>#root{min-height:100vh}.mobile-menu{display:none;bord
     }
     .order-card {
         padding: 16px !important;
+    }
+}
+
+
+/* ==========================================================================
+   AJUSTES FINALES RESPONSIVE
+   (al final a proposito: ganan en cascada sobre las reglas base de arriba)
+   ========================================================================== */
+
+/* Evita scroll horizontal: el menu lateral cerrado queda fuera de pantalla */
+html { overflow-x: clip; }
+
+/* Filtros/orden del catalogo: apilar en pantallas angostas (evita desborde) */
+@media (max-width: 900px) {
+    /* Los items del grid no deben exceder el ancho disponible */
+    .shop-layout > * { min-width: 0 !important; }
+}
+
+/* Catalogo GRILLA: 2 columnas en tablet; 1 columna solo en celular */
+@media (min-width: 481px) and (max-width: 900px) {
+    .shop-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 18px 16px !important;
+    }
+}
+
+@media (max-width: 650px) {
+    .shop-toolbar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+    }
+    .shop-views { flex-wrap: wrap !important; }
+    .shop-views > span { flex: 1; }
+    .shop-toolbar .sort-form,
+    .shop-toolbar .sort-label,
+    .shop-toolbar select {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+    .shop-toolbar select { box-sizing: border-box; }
+}
+
+/* Vista LISTA del catalogo: miniatura compacta + datos en pantallas angostas */
+@media (max-width: 900px) {
+    .shop-list li {
+        grid-template-columns: 140px 1fr !important;
+        gap: 14px !important;
+        align-items: start !important;
+    }
+    .shop-list .pc-thumb-wrap {
+        aspect-ratio: 1 !important;
+    }
+    .shop-list .pc-thumb-wrap .shop-thumb img {
+        aspect-ratio: 1 !important;
+        height: 100% !important;
+    }
+    .shop-list h2 {
+        font-size: 16px !important;
+        margin: 0 0 6px !important;
+    }
+    .shop-list .shop-price {
+        font-size: 15px !important;
+        margin: 2px 0 10px !important;
+    }
+    .shop-list .pc > div:not(.pc-thumb-wrap) {
+        padding: 4px 2px 8px !important;
+    }
+    .shop-list .shop-add {
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .shop-list li {
+        grid-template-columns: 104px 1fr !important;
+        gap: 12px !important;
+    }
+    .shop-list .pc-cart-label {
+        display: none;
+    }
+    .shop-list .pc-cart-btn {
+        padding: 8px 10px;
+    }
+    .shop-list h2 {
+        font-size: 15px !important;
     }
 }
