@@ -95,7 +95,7 @@ $totalBanners = count($banners);
 <section class="story" id="nosotros"><div class="story-image"><img loading="lazy" src="https://alpha-color.ancorathemes.com/wp-content/uploads/2017/04/image-30.jpg" alt="Colores y herramientas para impresión"><span>Más que insumos.<br><b>Un aliado para tu negocio.</b></span></div><div><p class="eyebrow blue">CREAMOS CON VOS</p><h2>Vos ponés la idea.<br>Nosotros, el color.</h2><p>Acompañamos a emprendedores, talleres y negocios con insumos y equipos para sublimación y estampado. Encontrá lo que necesitás para dar el siguiente paso.</p><ul><li>✓ Atención personalizada</li><li>✓ Compras mayoristas con revisión de stock</li><li>✓ Asesoramiento para elegir tu equipo</li></ul><a href="<?= e(whatsapp_url('Hola, quisiera asesoramiento para mi proyecto de sublimación.')) ?>" target="_blank" rel="noopener noreferrer" class="btn yellow">Hablemos de tu proyecto →</a></div></section>
 <section class="wholesale" id="mayoristas"><div><p class="eyebrow">PENSADO PARA TU NEGOCIO</p><h2>Comprar al por mayor,<br>sin complicaciones.</h2><a class="btn yellow" href="<?= e(site_url('cuenta.php?registro=1')) ?>">Solicitar cuenta mayorista →</a></div><ol><li><b>01</b><div><h3>Registrá tu negocio</h3><p>Completá tus datos. Revisamos y aprobamos tu cuenta manualmente.</p></div></li><li><b>02</b><div><h3>Armá tu pedido</h3><p>Accedé a precios mayoristas y enviá tu pedido con el pago coordinado.</p></div></li><li><b>03</b><div><h3>Confirmamos y coordinamos</h3><p>Verificamos stock antes del pago. Cuando habilitemos tu pedido, podrás adjuntar el comprobante en tu cuenta.</p></div></li></ol></section>
 <section class="faq"><p class="eyebrow blue">ANTES DE EMPEZAR</p><h2>Resolvemos tus dudas.</h2><details><summary>¿Por qué no puedo ver los precios?</summary><p>Los precios se muestran a clientes con cuenta mayorista aprobada. Registrate y esperá nuestra revisión.</p></details><details><summary>¿Cuándo tengo que pagar?</summary><p>No transfieras antes de que confirmemos el stock y el importe final. Te habilitaremos la carga del comprobante en tu cuenta.</p></details><details><summary>¿Puedo comprar por WhatsApp?</summary><p>Sí. Podés consultar por un producto o enviar el detalle de tu pedido para coordinar la compra.</p></details></section>
-<?php $igPosts = instagram_posts(); ?>
+<?php $igPosts = instagram_public_posts(); ?>
 <?php if ($igPosts): ?>
 <section class="home-insta">
     <div class="home-insta-inner">
@@ -108,7 +108,7 @@ $totalBanners = count($banners);
             <a class="btn yellow" href="<?= e(instagram_profile_url()) ?>" target="_blank" rel="noopener noreferrer">Ver <?= e(instagram_handle()) ?> ↗</a>
         </div>
         <div class="home-insta-grid">
-            <?php foreach (array_slice($igPosts, 0, 6) as $igPost):
+            <?php foreach ($igPosts as $igPost):
                 $igLink = $igPost['link'] !== '' ? $igPost['link'] : instagram_profile_url();
                 $igAlt  = $igPost['caption'] !== '' ? $igPost['caption'] : 'Publicación de Instagram de Serinsumos';
             ?>

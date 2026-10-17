@@ -2346,6 +2346,11 @@ function save_uploaded_image(array $file, string $subdir = 'general', int $maxMb
     return site_url('uploads/' . $subdir . '/' . $name);
 }
 
+/** Máximo de publicaciones de Instagram que se pueden cargar desde el panel. */
+const INSTAGRAM_MAX_POSTS = 18;
+/** Cuántas publicaciones se muestran siempre en la portada. */
+const INSTAGRAM_HOME_LIMIT = 6;
+
 function instagram_handle(): string {
     $h = trim(setting('instagram_handle', ''));
     return $h !== '' ? $h : '@ser.insumos';
@@ -2356,6 +2361,10 @@ function instagram_profile_url(): string {
     return 'https://www.instagram.com/' . rawurlencode($h) . '/';
 }
 
+/**
+ * Todas las publicaciones cargadas, en orden: primero las más recientes.
+ * Las guardadas antes de existir el mostrar/ocultar y el fijar se toman visibles.
+ */
 function instagram_posts(): array {
     $list = json_decode(setting('instagram_posts', ''), true);
     if (!is_array($list)) return [];
@@ -2368,7 +2377,34 @@ function instagram_posts(): array {
             'image'   => $img,
             'link'    => trim((string)($p['link'] ?? '')),
             'caption' => trim((string)($p['caption'] ?? '')),
+            'visible' => !array_key_exists('visible', $p) || (bool)$p['visible'],
+            'pinned'  => (bool)($p['pinned'] ?? false),
         ];
+        if (count($out) >= INSTAGRAM_MAX_POSTS) break;
+    }
+    return $out;
+}
+
+/**
+ * Índices (sobre la lista completa) que van a la portada:
+ * primero las fijadas y después las más recientes, hasta completar el cupo.
+ */
+function instagram_public_indexes(int $limit = INSTAGRAM_HOME_LIMIT): array {
+    $pinned = [];
+    $rest   = [];
+    foreach (instagram_posts() as $i => $p) {
+        if (!$p['visible']) continue;
+        if ($p['pinned']) $pinned[] = $i; else $rest[] = $i;
+    }
+    return array_slice(array_merge($pinned, $rest), 0, max(0, $limit));
+}
+
+/** Publicaciones que se ven en la portada: las fijadas + las más recientes. */
+function instagram_public_posts(int $limit = INSTAGRAM_HOME_LIMIT): array {
+    $posts = instagram_posts();
+    $out   = [];
+    foreach (instagram_public_indexes($limit) as $i) {
+        if (isset($posts[$i])) $out[] = $posts[$i];
     }
     return $out;
 }
@@ -2383,7 +2419,10 @@ function save_instagram_posts(array $posts): void {
             'image'   => $img,
             'link'    => trim((string)($p['link'] ?? '')),
             'caption' => trim((string)($p['caption'] ?? '')),
+            'visible' => !empty($p['visible']),
+            'pinned'  => !empty($p['pinned']),
         ];
+        if (count($clean) >= INSTAGRAM_MAX_POSTS) break;
     }
     save_setting('instagram_posts', json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 }

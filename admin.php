@@ -439,31 +439,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /* ── Instagram (portada) ─────────────────────────────────────── */
         } elseif ($act === 'save_instagram') {
-            $images = (array)($_POST['ig_image'] ?? []);
-            $links  = (array)($_POST['ig_link'] ?? []);
-            $caps   = (array)($_POST['ig_caption'] ?? []);
-            $files  = $_FILES['ig_file'] ?? null;
-            $posts  = [];
-            $total  = max(count($images), 1);
-            for ($i = 0; $i < $total; $i++) {
-                $img = trim((string)($images[$i] ?? ''));
-                if ($files && is_array($files['tmp_name'] ?? null) && isset($files['tmp_name'][$i]) && (int)($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $images   = (array)($_POST['ig_image']   ?? []);
+            $links    = (array)($_POST['ig_link']    ?? []);
+            $caps     = (array)($_POST['ig_caption'] ?? []);
+            $visibles = (array)($_POST['ig_visible'] ?? []);
+            $pinneds  = (array)($_POST['ig_pinned']  ?? []);
+            $borrar   = (array)($_POST['ig_delete']  ?? []);
+            $files    = $_FILES['ig_file'] ?? null;
+
+            $nuevas   = [];   /* se cargan ahora: son las más recientes, van al principio */
+            $vigentes = [];   /* ya estaban cargadas: conservan su orden */
+
+            foreach ($images as $key => $rawImg) {
+                $key = (string)$key;
+                $img = trim((string)$rawImg);
+                if ($files && is_array($files['tmp_name'] ?? null) && isset($files['tmp_name'][$key]) && (int)($files['error'][$key] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
                     $img = save_uploaded_image([
-                        'tmp_name' => $files['tmp_name'][$i],
-                        'error'    => $files['error'][$i],
-                        'size'     => $files['size'][$i],
+                        'tmp_name' => $files['tmp_name'][$key],
+                        'error'    => $files['error'][$key],
+                        'size'     => $files['size'][$key],
                     ], 'instagram', 8);
                 }
-                if ($img === '') continue;
-                $posts[] = [
+                if ($img === '') continue;                                     /* fila vacía: se ignora */
+                if ((string)($borrar[$key] ?? '0') === '1') continue;          /* el admin pidió quitarla */
+
+                $post = [
                     'image'   => $img,
-                    'link'    => (string)($links[$i] ?? ''),
-                    'caption' => (string)($caps[$i] ?? ''),
+                    'link'    => (string)($links[$key] ?? ''),
+                    'caption' => (string)($caps[$key] ?? ''),
+                    'visible' => (string)($visibles[$key] ?? '0') === '1',
+                    'pinned'  => (string)($pinneds[$key]  ?? '0') === '1',
                 ];
+                if ($key !== '' && $key[0] === 'n') $nuevas[] = $post; else $vigentes[] = $post;
             }
+
             save_setting('instagram_handle', trim((string)($_POST['instagram_handle'] ?? '')));
-            save_instagram_posts($posts);
-            set_flash('success', 'Sección de Instagram actualizada.');
+            save_instagram_posts(array_merge($nuevas, $vigentes));
+            set_flash('success', 'Sección de Instagram actualizada. La portada muestra las 6 más recientes entre las visibles.');
 
         } else {
             set_flash('error', 'Acción no reconocida.');
@@ -660,6 +672,18 @@ input:checked ~ .confirm-revoke { display:inline; }
 .prod-edit-grid label { margin-bottom: 0; }
 .prod-edit-grid label input, .prod-edit-grid label select, .prod-edit-grid label textarea { width: 100%; }
 @media(max-width:700px) { .prod-edit-grid { grid-template-columns: 1fr; } }
+
+/* ── Instagram: grilla de publicaciones ─────────────────────────────── */
+.ig-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.ig-grid > div { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ig-grid label { margin-bottom: 0; }
+.ig-grid label input { width: 100%; }
+.ig-grid .ig-caps { display: flex; gap: 6px; flex-wrap: wrap; min-height: 22px; }
+.ig-grid .ig-toggles { border-top: 1px dashed var(--line); padding-top: 10px; display: grid; gap: 8px; }
+.ig-grid .ig-toggles label { flex-direction: row; align-items: center; gap: 8px; margin: 0; font-size: 13px; }
+.ig-grid .ig-toggles label input { width: auto; }
+@media(max-width: 1100px) { .ig-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media(max-width: 700px)  { .ig-grid { grid-template-columns: 1fr; } }
 
 /* ── Paneles desplegables y cajas ───────────────────────────────────── */
 .panel-toggle { margin: 0; }
@@ -2986,9 +3010,66 @@ input:checked ~ .confirm-revoke { display:inline; }
         <div style="margin-bottom:40px">
             <h2 style="margin:0 0 6px">Instagram en la portada</h2>
             <p style="margin:0 0 20px">
-                Cargá las últimas publicaciones que querés mostrar en la página principal. Podés subir la imagen o pegar su enlace,
-                y opcionalmente el link de la publicación para que al hacer clic se abra en Instagram.
+                Cargá todas las publicaciones que quieras: la portada muestra <b>siempre las 6 más recientes</b> entre las visibles.
+                Podés <b>ocultar</b> las que no quieras mostrar y <b>fijar</b> las que tengan que verse siempre, aunque sean más antiguas.
+                Subí la imagen o pegá su enlace, y opcionalmente el link de la publicación.
             </p>
+
+            <?php
+            $igTodas    = instagram_posts();
+            $igCupo     = INSTAGRAM_HOME_LIMIT;
+            $igPortada  = instagram_public_indexes($igCupo);
+            $igVisibles = 0;
+            foreach ($igTodas as $igP) { if ($igP['visible']) $igVisibles++; }
+            $igLibres   = max(0, INSTAGRAM_MAX_POSTS - count($igTodas));
+            $igFilas    = $igLibres > 0 ? min(6, $igLibres) : 0;
+
+            /* Tarjeta de una publicación: se reusa para las cargadas y para las nuevas */
+            $igCard = static function (string $key, array $p, bool $enPortada, bool $esNueva): void { ?>
+                <div>
+                    <?php if ($p['image'] !== ''): ?>
+                        <img src="<?= e($p['image']) ?>" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;background:#f3f5f7">
+                    <?php else: ?>
+                        <div style="height:120px;border-radius:8px;background:#f3f5f7;display:grid;place-items:center;color:var(--gray);font-size:12px">Sin imagen</div>
+                    <?php endif; ?>
+                    <div class="ig-caps">
+                        <?php if ($esNueva): ?>
+                            <span class="badge badge-blue">Nueva</span>
+                        <?php elseif ($enPortada): ?>
+                            <span class="badge badge-green">✓ En la portada</span>
+                        <?php else: ?>
+                            <span class="badge badge-gray">Fuera de la portada</span>
+                        <?php endif; ?>
+                        <?php if (!$p['visible']): ?><span class="badge badge-gray">Oculta</span><?php endif; ?>
+                        <?php if ($p['pinned']): ?><span class="badge badge-pink">📌 Fijada</span><?php endif; ?>
+                    </div>
+                    <label>Subir imagen
+                        <input name="ig_file[<?= e($key) ?>]" type="file" accept="image/jpeg,image/png,image/webp">
+                    </label>
+                    <label>O pegar enlace de imagen
+                        <input name="ig_image[<?= e($key) ?>]" value="<?= e($p['image']) ?>" placeholder="https://...jpg">
+                    </label>
+                    <label>Link de la publicación
+                        <input name="ig_link[<?= e($key) ?>]" value="<?= e($p['link']) ?>" placeholder="https://www.instagram.com/p/...">
+                    </label>
+                    <label>Texto corto (opcional)
+                        <input name="ig_caption[<?= e($key) ?>]" value="<?= e($p['caption']) ?>" maxlength="90" placeholder="Ej: Nueva tanda de tintas">
+                    </label>
+                    <div class="ig-toggles">
+                        <input type="hidden" name="ig_visible[<?= e($key) ?>]" value="0">
+                        <label><input type="checkbox" name="ig_visible[<?= e($key) ?>]" value="1" <?= $p['visible'] ? 'checked' : '' ?>> Mostrar en la portada</label>
+                        <input type="hidden" name="ig_pinned[<?= e($key) ?>]" value="0">
+                        <label><input type="checkbox" name="ig_pinned[<?= e($key) ?>]" value="1" <?= $p['pinned'] ? 'checked' : '' ?>> 📌 Fijar: se ve siempre</label>
+                        <?php if (!$esNueva): ?>
+                            <input type="hidden" name="ig_delete[<?= e($key) ?>]" value="0">
+                            <label style="color:var(--pink)">
+                                <input type="checkbox" name="ig_delete[<?= e($key) ?>]" value="1" onclick="return confirm('¿Quitar esta publicación del listado?')"> 🗑 Quitar
+                            </label>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php };
+            ?>
 
             <form method="post" enctype="multipart/form-data">
                 <?= csrf_field() ?>
@@ -2999,33 +3080,41 @@ input:checked ~ .confirm-revoke { display:inline; }
                     <input name="instagram_handle" value="<?= e(instagram_handle()) ?>" placeholder="@ser.insumos">
                 </label>
 
-                <?php
-                $igRows = instagram_posts();
-                while (count($igRows) < 6) $igRows[] = ['image' => '', 'link' => '', 'caption' => ''];
-                ?>
-                <div class="prod-edit-grid">
-                    <?php foreach (array_slice($igRows, 0, 6) as $p): ?>
-                        <div style="border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px">
-                            <?php if ($p['image'] !== ''): ?>
-                                <img src="<?= e($p['image']) ?>" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;background:#f3f5f7">
-                            <?php endif; ?>
-                            <label style="margin:0">Subir imagen
-                                <input name="ig_file[]" type="file" accept="image/jpeg,image/png,image/webp">
-                            </label>
-                            <label style="margin:0">O pegar enlace de imagen
-                                <input name="ig_image[]" value="<?= e($p['image']) ?>" placeholder="https://...jpg">
-                            </label>
-                            <label style="margin:0">Link de la publicación
-                                <input name="ig_link[]" value="<?= e($p['link']) ?>" placeholder="https://www.instagram.com/p/...">
-                            </label>
-                            <label style="margin:0">Texto corto (opcional)
-                                <input name="ig_caption[]" value="<?= e($p['caption']) ?>" maxlength="90" placeholder="Ej: Nueva tanda de tintas">
-                            </label>
-                        </div>
-                    <?php endforeach; ?>
+                <div class="panel-box" style="margin:20px 0;max-width:860px">
+                    <b style="display:block;margin-bottom:6px">Cómo se arma la portada</b>
+                    Hay <b><?= count($igTodas) ?></b> publicación(es) cargada(s) y <b><?= $igVisibles ?></b> visible(s).
+                    La página principal muestra siempre <b><?= $igCupo ?></b>: primero las fijadas y después las más recientes.
+                    En este momento se están viendo <b><?= count($igPortada) ?></b>.
                 </div>
 
-                <button class="btn yellow" type="submit" style="margin-top:18px">Guardar Instagram</button>
+                <?php if ($igTodas): ?>
+                    <h3 style="margin:26px 0 6px">Publicaciones cargadas (<?= count($igTodas) ?> de <?= INSTAGRAM_MAX_POSTS ?>)</h3>
+                    <p style="margin:0 0 14px;color:var(--gray);font-size:13px">Primero las más recientes: lo que cargues ahora se suma arriba de todo.</p>
+                    <div class="ig-grid">
+                        <?php foreach ($igTodas as $i => $p): ?>
+                            <?php $igCard('p' . $i, $p, in_array($i, $igPortada, true), false); ?>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <p style="margin:26px 0 14px;color:var(--gray)">Todavía no cargaste publicaciones.</p>
+                <?php endif; ?>
+
+                <?php if ($igFilas > 0): ?>
+                    <h3 style="margin:30px 0 6px">Cargar publicaciones nuevas</h3>
+                    <p style="margin:0 0 14px;color:var(--gray);font-size:13px">
+                        Completá solo las que quieras sumar y guardá: las filas vacías se ignoran. Podés tener hasta <?= INSTAGRAM_MAX_POSTS ?> publicaciones en total
+                        y la portada siempre muestra <?= $igCupo ?>.
+                    </p>
+                    <div class="ig-grid">
+                        <?php for ($n = 0; $n < $igFilas; $n++): ?>
+                            <?php $igCard('n' . $n, ['image' => '', 'link' => '', 'caption' => '', 'visible' => true, 'pinned' => false], false, true); ?>
+                        <?php endfor; ?>
+                    </div>
+                <?php else: ?>
+                    <p style="margin:30px 0 0;color:var(--gray)">Llegaste al máximo de <?= INSTAGRAM_MAX_POSTS ?> publicaciones. Quitá alguna para cargar otra.</p>
+                <?php endif; ?>
+
+                <button class="btn yellow" type="submit" style="margin-top:22px">Guardar Instagram</button>
                 <small style="display:block;color:var(--gray);font-size:12px;margin-top:10px">
                     Las casillas vacías se ignoran. Si subís un archivo y además hay un enlace, se usa el archivo subido.
                 </small>
