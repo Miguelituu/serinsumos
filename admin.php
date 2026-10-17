@@ -1834,14 +1834,6 @@ input:checked ~ .confirm-revoke { display:inline; }
             </div>
             <?php if ($sec === 'productos'): ?>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-                <form method="post" style="display:inline;margin:0" onsubmit="return confirm('¿Sincronizar el catálogo desde los archivos CSV (12 categorías y 154 productos)?')">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="act" value="sync_csv_catalog">
-                    <input type="hidden" name="_tab" value="productos">
-                    <button class="btn outline" type="submit" style="white-space:nowrap" title="Recarga o actualiza las categorías y productos desde los CSV">
-                        🔄 Sincronizar catálogo CSV
-                    </button>
-                </form>
                 <button class="btn yellow" type="button" onclick="toggleNewProdPanel()" style="white-space:nowrap">
                     + Agregar nuevo producto
                 </button>
