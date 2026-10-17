@@ -868,7 +868,7 @@ function site_header(string $title = '', string $description = ''): void {
     <meta name="theme-color" content="#172530">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.7">
+    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.8">
     <link rel="icon" href="<?= e($favicon) ?>">
     <link rel="shortcut icon" href="<?= e($favicon) ?>">
     <script>document.documentElement.className += ' has-js';</script>
@@ -1033,10 +1033,6 @@ function site_footer(): void {
     </div>
 </footer>
 
-<button class="to-top" id="to-top" type="button" aria-label="Volver arriba" title="Volver arriba">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5.5 12.5 12 6l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-</button>
-
 <a class="floating-wa" href="<?= e(whatsapp_url()) ?>" target="_blank" rel="noopener noreferrer" aria-label="Contactar por WhatsApp">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.6a8.7 8.7 0 0 1-12.9 7.6L3 20.5l1.3-4.8A8.7 8.7 0 1 1 21 11.6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.2 8.1c.3-.6.6-.6.9-.6h.4c.2 0 .4 0 .5.4l.7 1.6c.1.3.1.4-.1.6l-.5.6c-.2.2-.2.4-.1.6.5.9 1.2 1.5 2.1 1.9.2.1.4.1.6-.1l.7-.8c.2-.2.4-.2.7-.1l1.5.7c.3.1.4.3.4.5 0 .3-.2 1.2-.7 1.5-.5.4-1.1.6-1.8.4-1-.2-2.2-.8-3.4-1.9-1-.9-1.8-2.1-2-2.8-.3-.8 0-1.7.3-2.5Z" fill="currentColor"/></svg>
 </a>
@@ -1075,31 +1071,6 @@ function site_footer(): void {
     }
     /* Red de seguridad: nunca dejar el overlay pegado si un recurso tarda demasiado */
     window.setTimeout(hideLoader, 6000);
-})();
-</script>
-
-<script>
-/* Botón "volver arriba": aparece al bajar y sube suave */
-(function () {
-    var btn = document.getElementById('to-top');
-    if (!btn) return;
-    var UMBRAL = 340;
-    var visible = false;
-    function update() {
-        var should = (window.pageYOffset || document.documentElement.scrollTop || 0) > UMBRAL;
-        if (should === visible) return;
-        visible = should;
-        btn.classList.toggle('is-visible', should);
-    }
-    window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update, { passive: true });
-    update();
-    btn.addEventListener('click', function () {
-        var reduce = false;
-        try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
-        window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
-        btn.blur();
-    });
 })();
 </script>
 
