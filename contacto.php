@@ -15,7 +15,8 @@ site_header('Contacto y Ubicación', 'Contactate con Serinsumos. Visitá nuestro
     text-align: center;
     margin-bottom: 48px;
 }
-.contact-header h1 {
+.contact-header h1,
+.contact-header h2 {
     font-size: clamp(32px, 4vw, 48px);
     margin: 10px 0 16px;
     letter-spacing: -1px;
@@ -168,11 +169,13 @@ site_header('Contacto y Ubicación', 'Contactate con Serinsumos. Visitá nuestro
 }
 </style>
 
+<?php page_hero('Contacto y ubicación', '<a href="' . e(site_url('index.php')) . '">Inicio</a> / Contacto'); ?>
+
 <main class="contact-page">
 
     <div class="contact-header">
         <p class="eyebrow blue">ATENCIÓN PERSONALIZADA</p>
-        <h1>Estamos para ayudarte</h1>
+        <h2>Estamos para ayudarte</h2>
         <p>¿Tenés dudas sobre insumos, compras mayoristas o querés retirar tu pedido personalmente? Contactanos por WhatsApp o visitanos en nuestro local en Córdoba.</p>
     </div>
 

@@ -699,6 +699,30 @@ function check_maintenance_mode(): void {
     exit;
 }
 
+/**
+ * Banda "hero" de página interna: degradado a todo el ancho con título y migas.
+ * Reutilizable en contacto.php, nosotros.php y cualquier página interna.
+ *
+ * @param string $title  Título principal (se escapa).
+ * @param string $crumb  Migas de pan (HTML ya construido/escapado por el llamador).
+ * @param string $kicker Texto pequeño superior (se escapa).
+ */
+function page_hero(string $title, string $crumb = '', string $kicker = ''): void {
+    ?>
+<section class="page-hero">
+    <div class="page-hero-inner">
+        <?php if ($kicker !== ''): ?>
+            <p class="page-hero-kicker"><?= e($kicker) ?></p>
+        <?php endif; ?>
+        <h1><?= e($title) ?></h1>
+        <?php if ($crumb !== ''): ?>
+            <p class="page-hero-crumb"><?= $crumb ?></p>
+        <?php endif; ?>
+    </div>
+</section>
+    <?php
+}
+
 function site_header(string $title = '', string $description = ''): void {
     $name = setting('site_name', APP_NAME);
     $user = current_user();
@@ -719,7 +743,7 @@ function site_header(string $title = '', string $description = ''): void {
     <meta name="theme-color" content="#172530">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.4">
+    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.5">
     <link rel="icon" href="<?= e($favicon) ?>">
     <link rel="shortcut icon" href="<?= e($favicon) ?>">
     <script>document.documentElement.className += ' has-js';</script>
@@ -767,7 +791,7 @@ function site_header(string $title = '', string $description = ''): void {
             <a href="<?= e(site_url('index.php')) ?>" class="<?= $currentScript === 'index.php' ? 'active' : '' ?>">Inicio</a>
             <a href="<?= e(site_url('catalogo.php')) ?>" class="<?= $currentScript === 'catalogo.php' ? 'active' : '' ?>">Tienda</a>
             <a href="<?= e(site_url('index.php#mayoristas')) ?>">Mayoristas</a>
-            <a href="<?= e(site_url('index.php#nosotros')) ?>">Nosotros</a>
+            <a href="<?= e(site_url('nosotros.php')) ?>" class="<?= $currentScript === 'nosotros.php' ? 'active' : '' ?>">Nosotros</a>
             <a href="<?= e(site_url('contacto.php')) ?>" class="<?= $currentScript === 'contacto.php' ? 'active' : '' ?>">Contacto</a>
             <a href="https://www.instagram.com/ser.insumos/" target="_blank" rel="noopener noreferrer">Instagram</a>
         </nav>
@@ -805,7 +829,7 @@ function site_header(string $title = '', string $description = ''): void {
         <a href="<?= e(site_url('index.php')) ?>" class="<?= $currentScript === 'index.php' ? 'active' : '' ?>">🏠 Inicio</a>
         <a href="<?= e(site_url('catalogo.php')) ?>" class="<?= $currentScript === 'catalogo.php' ? 'active' : '' ?>">📦 Tienda / Catálogo</a>
         <a href="<?= e(site_url('index.php#mayoristas')) ?>">💼 Venta Mayorista</a>
-        <a href="<?= e(site_url('index.php#nosotros')) ?>">👥 Nosotros</a>
+        <a href="<?= e(site_url('nosotros.php')) ?>">👥 Nosotros</a>
         <a href="<?= e(site_url('contacto.php')) ?>" class="<?= $currentScript === 'contacto.php' ? 'active' : '' ?>">💬 Contacto / Ubicación</a>
         <a href="<?= e(site_url('cuenta.php')) ?>">👤 Mi cuenta mayorista</a>
         <a href="<?= e(site_url('carrito.php')) ?>">🛒 Mi pedido <?= cart_count() > 0 ? '(' . cart_count() . ')' : '' ?></a>
@@ -856,7 +880,7 @@ function site_footer(): void {
             <h4>Navegación</h4>
             <a href="<?= e(site_url('catalogo.php')) ?>">Catálogo de productos</a>
             <a href="<?= e(site_url('index.php#mayoristas')) ?>">Cómo comprar mayorista</a>
-            <a href="<?= e(site_url('index.php#nosotros')) ?>">Sobre Serinsumos</a>
+            <a href="<?= e(site_url('nosotros.php')) ?>">Sobre Serinsumos</a>
             <a href="<?= e(site_url('carrito.php')) ?>">Mi pedido</a>
         </div>
 
@@ -996,20 +1020,43 @@ function render_product_card(array $p): void {
  * ─────────────────────────────────────────────────────────────────────── */
 
 /**
+ * ¿La tabla product_overrides ya tiene la columna image_url?
+ * Si no existe, la crea (migración idempotente) y devuelve true.
+ * Cacheado una sola vez por petición.
+ */
+function overrides_have_image_column(): bool {
+    static $has = null;
+    if ($has !== null) return $has;
+    try {
+        $has = (bool)db()->query("SHOW COLUMNS FROM product_overrides LIKE 'image_url'")->fetch();
+        if (!$has) {
+            db()->exec("ALTER TABLE product_overrides ADD COLUMN image_url VARCHAR(500) NOT NULL DEFAULT '' AFTER notes");
+            $has = (bool)db()->query("SHOW COLUMNS FROM product_overrides LIKE 'image_url'")->fetch();
+        }
+    } catch (Throwable) {
+        $has = false;
+    }
+    return $has;
+}
+
+/**
  * Carga todos los overrides indexados por api_handle.
  * Resultado cacheado en memoria por petición.
  */
 function get_all_overrides(): array {
     static $cache = null;
     if ($cache !== null) return $cache;
+    $hasImage = overrides_have_image_column();
+    $cols = 'api_handle, label, price_override, currency_symbol,
+                    category, notes, visible, deleted, sort_order';
+    if ($hasImage) $cols .= ', image_url';
     try {
-        $rows = db()->query(
-            'SELECT api_handle, label, price_override, currency_symbol,
-                    category, notes, visible, deleted, sort_order
-               FROM product_overrides'
-        )->fetchAll();
+        $rows = db()->query("SELECT $cols FROM product_overrides")->fetchAll();
         $cache = [];
-        foreach ($rows as $r) $cache[$r['api_handle']] = $r;
+        foreach ($rows as $r) {
+            if (!isset($r['image_url'])) $r['image_url'] = '';
+            $cache[$r['api_handle']] = $r;
+        }
     } catch (Throwable) { $cache = []; }
     return $cache;
 }
@@ -1054,6 +1101,13 @@ function apply_override(array $product): array {
         $product['_display_title'] = (string)($product['title'] ?? '');
     }
 
+    /* Imagen local: reemplaza la de la API cuando el admin cargó una propia */
+    $overrideImage = $override !== null ? trim((string)($override['image_url'] ?? '')) : '';
+    $product['_image_override'] = $overrideImage;
+    if ($overrideImage !== '') {
+        $product['image'] = $overrideImage;
+    }
+
     return $product;
 }
 
@@ -1089,7 +1143,7 @@ function get_products_with_overrides(int $limit = 200, bool $adminMode = false):
 
 /**
  * Guarda (insert o update) un override en la BD.
- * @param array $data Claves: label, price_override, currency_symbol, category, notes, visible, sort_order
+ * @param array $data Claves: label, price_override, currency_symbol, category, notes, visible, sort_order, image_url
  */
 function save_override(string $handle, array $data): void {
     $handle = trim($handle);
@@ -1103,6 +1157,33 @@ function save_override(string $handle, array $data): void {
     $notes          = trim((string)($data['notes'] ?? ''));
     $visible        = isset($data['visible']) ? (int)(bool)$data['visible'] : 1;
     $sortOrder      = isset($data['sort_order']) ? (int)$data['sort_order'] : 0;
+
+    if (overrides_have_image_column()) {
+        /* Si el llamador no manda 'image_url', se conserva la imagen guardada */
+        if (array_key_exists('image_url', $data)) {
+            $imageUrl = trim((string)$data['image_url']);
+        } else {
+            $existing = get_override($handle);
+            $imageUrl = trim((string)($existing['image_url'] ?? ''));
+        }
+
+        db()->prepare(
+            'INSERT INTO product_overrides
+                (api_handle, label, price_override, currency_symbol, category, notes, image_url, visible, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                label=VALUES(label),
+                price_override=VALUES(price_override),
+                currency_symbol=VALUES(currency_symbol),
+                category=VALUES(category),
+                notes=VALUES(notes),
+                image_url=VALUES(image_url),
+                visible=VALUES(visible),
+                sort_order=VALUES(sort_order),
+                updated_at=NOW()'
+        )->execute([$handle, $label, $priceOverride, $currencySymbol, $category, $notes, $imageUrl, $visible, $sortOrder]);
+        return;
+    }
 
     db()->prepare(
         'INSERT INTO product_overrides

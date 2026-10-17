@@ -1089,11 +1089,57 @@ html { overflow-x: clip; }
 
 .to-top svg { width: 24px; height: 24px; display: block; }
 
-/* Banner del catalogo: a todo el ancho, igual que el hero de la home */
-.shop-banner {
+/* Banda de pagina (catalogo, contacto, nosotros): a todo el ancho, igual que el hero */
+.shop-banner,
+.page-hero {
     margin-left: 0 !important;
     margin-right: 0 !important;
     border-radius: 0 !important;
+}
+
+.page-hero {
+    min-height: 220px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    color: #fff;
+    padding: 44px 24px;
+    background: linear-gradient(100deg, #ed3285 0%, #7a5ec8 48%, #39aef2 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.page-hero-inner { max-width: 900px; }
+
+.page-hero h1 {
+    font-size: 64px;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1.05;
+}
+
+.page-hero p { margin: 8px 0 0; font-size: 15px; }
+.page-hero a { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.page-hero a:hover { color: #fff; opacity: .85; }
+.page-hero-kicker {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: .9;
+    margin: 0 0 6px !important;
+}
+.page-hero-crumb { font-size: 14px; opacity: .95; }
+
+@media (max-width: 900px) {
+    .page-hero h1 { font-size: 42px; }
+}
+
+@media (max-width: 768px) {
+    .shop-banner,
+    .page-hero { min-height: 160px !important; }
+    .page-hero h1 { font-size: 34px; }
+    .page-hero { padding: 34px 18px; }
 }
 
 /* En tablet/celular achico el boton junto con el de WhatsApp para que queden parejos */

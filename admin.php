@@ -56,12 +56,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($act === 'save_override') {
             $handle = trim((string)($_POST['api_handle'] ?? ''));
             if ($handle === '') throw new RuntimeException('El handle del producto es obligatorio.');
+
+            /* Imagen: un archivo subido manda; si no, se usa la URL del campo
+               (vacío = volver a la imagen original de la API de Hostinger). */
+            $imageUrl = trim((string)($_POST['image_url'] ?? ''));
+            if (!empty($_FILES['image_file']['tmp_name']) && $_FILES['image_file']['error'] === UPLOAD_ERR_OK) {
+                $file = $_FILES['image_file'];
+                if ($file['size'] > 10 * 1024 * 1024) throw new RuntimeException('La imagen no debe superar los 10 MB.');
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mime = $finfo->file($file['tmp_name']);
+                $exts = ['image/jpeg'=>'jpg', 'image/png'=>'png', 'image/webp'=>'webp', 'image/gif'=>'gif'];
+                if (!isset($exts[$mime])) throw new RuntimeException('Formato de imagen inválido. Usá JPG, PNG o WebP.');
+                $uDir = __DIR__ . '/uploads/products';
+                if (!is_dir($uDir) && !mkdir($uDir, 0755, true) && !is_dir($uDir)) throw new RuntimeException('No se pudo preparar la carpeta para imágenes.');
+                $imgName = 'prod_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $exts[$mime];
+                if (!move_uploaded_file($file['tmp_name'], $uDir . '/' . $imgName)) throw new RuntimeException('No se pudo guardar la imagen.');
+                $imageUrl = site_url('uploads/products/' . $imgName);
+            }
+
             save_override($handle, [
                 'label'           => $_POST['label']          ?? '',
                 'price_override'  => $_POST['price_override'] ?? '',
                 'currency_symbol' => $_POST['currency_symbol'] ?? '$',
                 'category'        => $_POST['category']        ?? '',
                 'notes'           => $_POST['notes']           ?? '',
+                'image_url'       => $imageUrl,
                 'visible'         => isset($_POST['visible']) && $_POST['visible'] === '1' ? 1 : 0,
                 'sort_order'      => $_POST['sort_order']      ?? 0,
             ]);
@@ -1433,7 +1452,7 @@ input:checked ~ .confirm-revoke { display:inline; }
 
                             <?php else: ?>
                                 <!-- ── Formulario edición AJUSTE HOSTINGER ── -->
-                                <form method="post">
+                                <form method="post" enctype="multipart/form-data">
                                     <?= csrf_field() ?>
                                     <input type="hidden" name="act"        value="save_override">
                                     <input type="hidden" name="_tab"       value="productos">
@@ -1468,6 +1487,33 @@ input:checked ~ .confirm-revoke { display:inline; }
                                         <label>Orden en el catálogo
                                             <input name="sort_order" type="number" min="-999" max="9999" value="<?= e($ovr['sort_order'] ?? '0') ?>">
                                             <span class="prod-api-price">Menor número aparece primero.</span>
+                                        </label>
+
+                                        <div class="prod-edit-notes">
+                                            <label>Imagen del producto
+                                                <span style="display:flex;align-items:center;gap:12px;margin-top:6px">
+                                                    <?php if (!empty($p['image'])): ?>
+                                                        <img src="<?= e($p['image']) ?>" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex-shrink:0">
+                                                    <?php else: ?>
+                                                        <span class="prod-thumb-placeholder">▧</span>
+                                                    <?php endif; ?>
+                                                    <small style="color:var(--gray);font-size:11px;line-height:1.5">
+                                                        <?= !empty($p['_image_override'])
+                                                            ? '🖼️ Imagen personalizada (ajuste local)'
+                                                            : '🌐 Imagen original de Hostinger' ?>
+                                                    </small>
+                                                </span>
+                                            </label>
+                                        </div>
+
+                                        <label>Subir nueva imagen desde tu equipo
+                                            <input name="image_file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+                                            <small style="color:var(--gray);font-size:11px">JPG, PNG o WebP (máx. 10 MB). Reemplaza la imagen actual del producto.</small>
+                                        </label>
+
+                                        <label>O enlace URL de imagen
+                                            <input name="image_url" type="url" value="<?= e($ovr['image_url'] ?? '') ?>" placeholder="Vacío = usar la imagen de Hostinger">
+                                            <small style="color:var(--gray);font-size:11px">Dejalo vacío para volver a la imagen original de Hostinger.</small>
                                         </label>
 
                                         <div class="prod-edit-notes">
