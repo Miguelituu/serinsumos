@@ -367,7 +367,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tab = (string)($_POST['_tab'] ?? 'clientes');
     $extra = '';
     if (!empty($_POST['_order_id'])) {
-        $extra = '&pedido=' . (int)$_POST['_order_id'];
+        /* Volver a la vista de detalle de ese pedido (no al listado) */
+        $extra = '&ver=' . (int)$_POST['_order_id'];
     }
     redirect('admin.php?tab=' . urlencode($tab) . $extra);
 }
@@ -505,6 +506,41 @@ site_header('Administración', 'Administración de clientes mayoristas, WhatsApp
 /* ── Confirmación revocar ───────────────────────────────────────────── */
 .confirm-revoke { display:none; }
 input:checked ~ .confirm-revoke { display:inline; }
+
+/* ── Listado compacto de pedidos ────────────────────────────────────── */
+.orders-list { display: flex; flex-direction: column; gap: 12px; }
+.order-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-left: 5px solid var(--gray);
+    border-radius: 10px;
+    padding: 15px 18px;
+    transition: box-shadow .15s ease;
+}
+.order-row:hover { box-shadow: 0 6px 18px #17253014; }
+.order-row.st-pending_review   { border-left-color: #e0b400; }
+.order-row.st-confirmed        { border-left-color: #20ba67; }
+.order-row.st-payment_uploaded { border-left-color: var(--blue); }
+.order-row.st-completed        { border-left-color: #0d7a4a; }
+.order-row.st-cancelled        { border-left-color: var(--pink); opacity: .85; }
+.or-main { flex: 1 1 340px; min-width: 0; }
+.or-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.or-num { font-family: Rubik, sans-serif; font-size: 16px; font-weight: 700; }
+.or-sub { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 13px; color: var(--gray); margin-top: 7px; }
+.or-sub b { color: var(--ink); }
+.or-right { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+.or-total { font-family: Rubik, sans-serif; font-size: 18px; font-weight: 700; text-align: right; line-height: 1.15; }
+.or-total small { display: block; font: 400 11px Hind, sans-serif; color: var(--gray); margin-top: 3px; }
+@media(max-width: 640px) {
+    .order-row { padding: 14px; }
+    .or-main { flex: 1 1 100%; }
+    .or-right { margin-left: 0; width: 100%; justify-content: space-between; }
+    .or-total { text-align: left; }
+}
 
 @media(max-width: 700px) {
     .admin-stats { grid-template-columns: 1fr 1fr; }
@@ -673,21 +709,36 @@ input:checked ~ .confirm-revoke { display:inline; }
 
         <?php
         $statusFilter = trim((string)($_GET['estado'] ?? ''));
+        $viewOrderId  = (int)($_GET['ver'] ?? $_GET['pedido'] ?? 0);
         $ordersList = $allAdminOrders;
         if ($statusFilter !== '') {
             $ordersList = array_values(array_filter($ordersList, fn($o) => $o['status'] === $statusFilter));
+        }
+        $backUrl = 'admin.php?tab=pedidos' . ($statusFilter !== '' ? '&estado=' . urlencode($statusFilter) : '');
+        $orderFound = $viewOrderId < 1;
+        foreach ($ordersList as $__o) {
+            if ((int)$__o['id'] === $viewOrderId) { $orderFound = true; break; }
         }
         ?>
 
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px">
             <div>
-                <h2>Gestión de pedidos mayoristas</h2>
-                <p style="margin:0;color:var(--gray);font-size:14px">
-                    Revisá el stock físico disponible de cada artículo pedido. Podés ajustar cantidades o marcar productos como agotados para recalcular el total y habilitar la transferencia al cliente.
-                </p>
+                <?php if ($viewOrderId > 0): ?>
+                    <a href="<?= e($backUrl) ?>" class="btn outline btn-small" style="margin:0 0 12px">← Volver al listado de pedidos</a>
+                    <h2 style="margin:0">Gestionar pedido</h2>
+                    <p style="margin:4px 0 0;color:var(--gray);font-size:14px">
+                        Revisá el stock de cada artículo, ajustá cantidades, marcá agotados, confirmá el pedido o descargá el PDF para el cliente.
+                    </p>
+                <?php else: ?>
+                    <h2>Gestión de pedidos mayoristas</h2>
+                    <p style="margin:0;color:var(--gray);font-size:14px">
+                        Entrá a <b>Gestionar</b> para revisar el stock, confirmar pedidos, registrar pagos o descargar el PDF para el cliente.
+                    </p>
+                <?php endif; ?>
             </div>
         </div>
 
+        <?php if ($viewOrderId < 1): ?>
         <!-- Filtros rápidos por estado -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">
             <a href="admin.php?tab=pedidos"
@@ -716,21 +767,74 @@ input:checked ~ .confirm-revoke { display:inline; }
                 ✓ Completados
             </a>
         </div>
+        <?php endif; ?>
 
-        <?php if (empty($ordersList)): ?>
+        <?php if ($viewOrderId > 0 && !$orderFound): ?>
+            <div class="access-box">
+                <p style="margin:0">No encontramos ese pedido. <a href="<?= e($backUrl) ?>"><b>Volver al listado</b></a>.</p>
+            </div>
+        <?php elseif (empty($ordersList)): ?>
             <div class="access-box">
                 <p style="margin:0">No hay pedidos que coincidan con este filtro.</p>
             </div>
         <?php else: ?>
 
+            <?php if ($viewOrderId < 1): ?><div class="orders-list"><?php endif; ?>
+
             <?php foreach ($ordersList as $ord):
                 $ordId = (int)$ord['id'];
                 $ordStatus = $ord['status'];
-                $ordItems = get_order_items($ordId);
                 $hasReceipt = !empty($ord['receipt_path']);
                 $clientWa = preg_replace('/\D+/', '', (string)$ord['user_phone']);
                 $clientWaUrl = $clientWa !== '' ? ('https://wa.me/' . $clientWa . '?text=' . rawurlencode('Hola ' . ($ord['user_name'] ?: 'cliente') . '! Nos comunicamos de Serinsumos por tu pedido ' . $ord['order_number'] . '.')) : '';
+                $cardUrl = 'admin.php?tab=pedidos&ver=' . $ordId . ($statusFilter !== '' ? '&estado=' . urlencode($statusFilter) : '');
+                if ($viewOrderId > 0 && $ordId !== $viewOrderId) { continue; }
             ?>
+
+            <?php if ($viewOrderId < 1): ?>
+                <!-- ── Fila compacta del pedido ───────────────────────────────── -->
+                <div class="order-row st-<?= e($ordStatus) ?>">
+                    <div class="or-main">
+                        <div class="or-top">
+                            <span class="or-num"><?= e($ord['order_number']) ?></span>
+                            <?php if ($ordStatus === 'pending_review'): ?>
+                                <span class="badge badge-yellow">⏳ Pendiente de revisión</span>
+                            <?php elseif ($ordStatus === 'confirmed'): ?>
+                                <span class="badge badge-green">🟢 Confirmado · esperando pago</span>
+                            <?php elseif ($ordStatus === 'payment_uploaded'): ?>
+                                <span class="badge badge-blue">🟣 Comprobante recibido · verificar pago</span>
+                            <?php elseif ($ordStatus === 'completed'): ?>
+                                <span class="badge badge-green">✓ Completado y entregado</span>
+                            <?php else: ?>
+                                <span class="badge badge-pink">✕ Cancelado</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="or-sub">
+                            <span>🏢 <b><?= e($ord['user_business'] ?: $ord['user_name']) ?></b></span>
+                            <span>·</span>
+                            <span><?= e($ord['user_name']) ?></span>
+                            <span>·</span>
+                            <span><?= e(date('d/m/Y H:i', strtotime($ord['created_at']))) ?></span>
+                            <?php if ((int)($ord['out_of_stock_items'] ?? 0) > 0): ?>
+                                <span class="badge badge-pink"><?= (int)$ord['out_of_stock_items'] ?> sin stock</span>
+                            <?php endif; ?>
+                            <?php if (!empty($ord['receipt_path'])): ?>
+                                <span class="badge badge-blue">📎 Comprobante</span>
+                            <?php elseif (!empty($ord['customer_notes'])): ?>
+                                <span class="badge badge-gray">📝 Nota del cliente</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="or-right">
+                        <div class="or-total">
+                            <?= e($ord['currency_symbol'] ?: '$') ?><?= number_format((float)$ord['total_amount'], 2, ',', '.') ?>
+                            <small><?= (int)$ord['total_items'] ?> artículo<?= (int)$ord['total_items'] === 1 ? '' : 's' ?></small>
+                        </div>
+                        <a class="btn yellow btn-small" href="<?= e($cardUrl) ?>" style="margin:0">Gestionar →</a>
+                    </div>
+                </div>
+            <?php else: ?>
+                <?php $ordItems = get_order_items($ordId); ?>
                 <div class="order-card status-<?= e($ordStatus) ?>" id="order-<?= $ordId ?>" style="margin-bottom:32px">
 
                     <!-- Cabecera del pedido -->
@@ -1006,7 +1110,10 @@ input:checked ~ .confirm-revoke { display:inline; }
                     </div>
 
                 </div>
+            <?php endif; ?>
             <?php endforeach; ?>
+
+            <?php if ($viewOrderId < 1): ?></div><?php endif; ?>
 
         <?php endif; ?>
 
