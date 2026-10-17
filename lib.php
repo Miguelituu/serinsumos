@@ -868,7 +868,7 @@ function site_header(string $title = '', string $description = ''): void {
     <meta name="theme-color" content="#172530">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=3.0">
+    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=3.1">
     <link rel="icon" href="<?= e($favicon) ?>">
     <link rel="shortcut icon" href="<?= e($favicon) ?>">
     <script>document.documentElement.className += ' has-js';</script>
@@ -2350,11 +2350,8 @@ function save_uploaded_image(array $file, string $subdir = 'general', int $maxMb
 const INSTAGRAM_MAX_POSTS = 18;
 /** Cuántas publicaciones se muestran siempre en la portada. */
 const INSTAGRAM_HOME_LIMIT = 6;
-/** Cada cuánto se vuelve a leer el origen automático (segundos). */
-const INSTAGRAM_REFRESH_TTL = 10800;
-/** Cada cuánto se renueva el token largo de Instagram (segundos). */
-const INSTAGRAM_TOKEN_TTL = 2592000;
 
+/** Usuario de Instagram del negocio (se usa en los enlaces y en el pie). */
 function instagram_handle(): string {
     $h = trim(setting('instagram_handle', ''));
     return $h !== '' ? $h : '@ser.insumos';
@@ -2365,291 +2362,11 @@ function instagram_profile_url(): string {
     return 'https://www.instagram.com/' . rawurlencode($h) . '/';
 }
 
-/* ── Origen automático del feed ──────────────────────────────────────── */
-
-/** Cómo se cargan las publicaciones: 'auto' (desde Instagram) o 'manual'. */
-function instagram_mode(): string {
-    $m = setting('instagram_mode', '');
-    if ($m === 'auto' || $m === 'manual') return $m;
-    return (instagram_behold_url() !== '' || instagram_token() !== '') ? 'auto' : 'manual';
-}
-
-/** De dónde se leen: 'behold' (feed JSON) o 'graph' (API oficial con token). */
-function instagram_source(): string {
-    return setting('instagram_source', 'behold') === 'graph' ? 'graph' : 'behold';
-}
-
-function instagram_behold_url(): string { return trim(setting('instagram_behold_url', '')); }
-function instagram_token(): string { return trim(setting('instagram_token', '')); }
-
-/** Lo último que se trajo: {fetched_at, last_try, posts, error, source}. */
-function instagram_cache(): array {
-    $d = json_decode(setting('instagram_cache', ''), true);
-    if (!is_array($d)) $d = [];
-    $posts = [];
-    foreach ((array)($d['posts'] ?? []) as $p) {
-        if (is_array($p)) $posts[] = $p;
-    }
-    return [
-        'fetched_at' => (int)($d['fetched_at'] ?? 0),
-        'last_try'   => (int)($d['last_try'] ?? 0),
-        'posts'      => $posts,
-        'error'      => (string)($d['error'] ?? ''),
-        'source'     => (string)($d['source'] ?? ''),
-    ];
-}
-
-/** Ajustes del panel sobre las publicaciones automáticas (por id). */
-function instagram_overrides(): array {
-    $d = json_decode(setting('instagram_overrides', ''), true);
-    return is_array($d) ? $d : [];
-}
-
-function save_instagram_overrides(array $map): void {
-    $clean = [];
-    foreach ($map as $id => $o) {
-        $id = (string)$id;
-        if ($id === '' || !is_array($o)) continue;
-        $visible = !empty($o['visible']);
-        $pinned  = !empty($o['pinned']);
-        if ($visible && !$pinned) continue;   /* los valores por defecto no se guardan */
-        $clean[$id] = ['visible' => $visible, 'pinned' => $pinned];
-    }
-    save_setting('instagram_overrides', json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-}
-
-/** Clave para que un cron del hosting pueda pedir la actualización. */
-function instagram_cron_key(): string {
-    $k = trim(setting('instagram_cron_key', ''));
-    if ($k === '') {
-        $k = bin2hex(random_bytes(16));
-        save_setting('instagram_cron_key', $k);
-    }
-    return $k;
-}
-
-/** Texto corto y en una línea, para las tarjetas de la portada. */
-function instagram_short_caption(string $text): string {
-    $text = trim((string)preg_replace('~\s+~u', ' ', $text));
-    if ($text === '') return '';
-    $long = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
-    if ($long <= 140) return $text;
-    $cut = function_exists('mb_substr') ? mb_substr($text, 0, 139, 'UTF-8') : substr($text, 0, 139);
-    return rtrim($cut) . '…';
-}
-
-function instagram_ago(int $ts): string {
-    if ($ts <= 0) return 'nunca';
-    $d = time() - $ts;
-    if ($d < 60) return 'hace instantes';
-    if ($d < 3600) return 'hace ' . intdiv($d, 60) . ' min';
-    if ($d < 86400) return 'hace ' . intdiv($d, 3600) . ' h';
-    return 'hace ' . intdiv($d, 86400) . ' día(s)';
-}
-
-/** GET simple para las integraciones (curl, con recorte de tiempo). */
-function http_get(string $url, int $timeout = 12): array {
-    if (!preg_match('~^https?://~i', $url)) return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'La dirección no es válida.'];
-    if (function_exists('curl_init')) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS      => 3,
-            CURLOPT_CONNECTTIMEOUT => 6,
-            CURLOPT_TIMEOUT        => $timeout,
-            CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; Serinsumos)',
-        ]);
-        $body = curl_exec($ch);
-        $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        $err  = (string)curl_error($ch);
-        curl_close($ch);
-        if ($body === false) return ['ok' => false, 'status' => $code, 'body' => '', 'error' => $err !== '' ? $err : 'No se pudo conectar.'];
-        $ok = $code >= 200 && $code < 300;
-        return ['ok' => $ok, 'status' => $code, 'body' => (string)$body, 'error' => $ok ? '' : 'El servidor respondió HTTP ' . $code . '.'];
-    }
-    $ctx  = stream_context_create(['http' => ['timeout' => $timeout, 'follow_location' => 1, 'user_agent' => 'Serinsumos'], 'ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
-    $body = @file_get_contents($url, false, $ctx);
-    if ($body === false) return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'No se pudo conectar.'];
-    return ['ok' => true, 'status' => 200, 'body' => (string)$body, 'error' => ''];
-}
-
-/** Normaliza una publicación al formato que usa la portada. */
-function instagram_norm_post(string $id, string $image, string $link, string $caption, string $ts): ?array {
-    $image = trim($image);
-    if ($image === '') return null;
-    $id = trim($id);
-    if ($id === '') $id = substr(sha1($image), 0, 12);
-    return [
-        'id'        => $id,
-        'image'     => $image,
-        'link'      => trim($link),
-        'caption'   => instagram_short_caption($caption),
-        'timestamp' => trim($ts),
-    ];
-}
-
-/** Lee la respuesta de un feed JSON de Behold. */
-function instagram_parse_behold(string $body): array {
-    $data = json_decode($body, true);
-    if (!is_array($data) || !is_array($data['posts'] ?? null)) {
-        throw new RuntimeException('La dirección no devolvió un feed de Instagram válido.');
-    }
-    $out = [];
-    foreach ($data['posts'] as $p) {
-        if (!is_array($p)) continue;
-        $sizes = is_array($p['sizes'] ?? null) ? $p['sizes'] : [];
-        $img   = (string)($sizes['medium']['mediaUrl'] ?? $sizes['large']['mediaUrl'] ?? $sizes['full']['mediaUrl'] ?? $p['mediaUrl'] ?? '');
-        if ($img === '' && is_array($p['children'][0] ?? null)) {
-            $cs  = is_array($p['children'][0]['sizes'] ?? null) ? $p['children'][0]['sizes'] : [];
-            $img = (string)($cs['medium']['mediaUrl'] ?? $cs['large']['mediaUrl'] ?? '');
-        }
-        $post = instagram_norm_post(
-            (string)($p['id'] ?? ''),
-            $img,
-            (string)($p['permalink'] ?? ''),
-            (string)($p['prunedCaption'] ?? $p['caption'] ?? ''),
-            (string)($p['timestamp'] ?? '')
-        );
-        if ($post !== null) $out[] = $post;
-    }
-    return $out;
-}
-
-/** Lee la respuesta de la API oficial de Instagram. */
-function instagram_parse_graph(string $body): array {
-    $data = json_decode($body, true);
-    if (!is_array($data)) throw new RuntimeException('Instagram devolvió una respuesta ilegible.');
-    if (!empty($data['error'])) throw new RuntimeException('Instagram: ' . (string)($data['error']['message'] ?? 'error desconocido'));
-    if (!is_array($data['data'] ?? null)) throw new RuntimeException('Instagram no devolvió publicaciones.');
-    $out = [];
-    foreach ($data['data'] as $p) {
-        if (!is_array($p)) continue;
-        $img  = (($p['media_type'] ?? '') === 'VIDEO') ? (string)($p['thumbnail_url'] ?? '') : (string)($p['media_url'] ?? '');
-        $post = instagram_norm_post((string)($p['id'] ?? ''), $img, (string)($p['permalink'] ?? ''), (string)($p['caption'] ?? ''), (string)($p['timestamp'] ?? ''));
-        if ($post !== null) $out[] = $post;
-    }
-    return $out;
-}
-
-/** Baja una imagen a uploads/instagram/auto (una sola vez por publicación). */
-function instagram_mirror_image(string $url, string $id): string {
-    $id = (string)preg_replace('~[^A-Za-z0-9_-]~', '', $id);
-    if ($id === '') return '';
-    $dir = __DIR__ . '/uploads/instagram/auto';
-    if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) return '';
-
-    $rel = 'uploads/instagram/auto/ig_' . $id;
-    foreach (['webp', 'jpg', 'jpeg', 'png'] as $ext) {
-        if (is_file(__DIR__ . '/' . $rel . '.' . $ext)) return site_url($rel . '.' . $ext);
-    }
-
-    $r = http_get($url, 15);
-    if (!$r['ok'] || $r['body'] === '' || strlen($r['body']) > 6 * 1024 * 1024) return '';
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($r['body']);
-    $exts = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-    if (!isset($exts[$mime])) return '';
-    if (file_put_contents(__DIR__ . '/' . $rel . '.' . $exts[$mime], $r['body']) === false) return '';
-    return site_url($rel . '.' . $exts[$mime]);
-}
-
-/** Renueva el token largo de Instagram cuando ya pasó el tiempo prudencial. */
-function instagram_refresh_token(string $token): string {
-    $at = (int)setting('instagram_token_at', '0');
-    if ($at > 0 && (time() - $at) < INSTAGRAM_TOKEN_TTL) return $token;
-    $r = http_get('https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=' . rawurlencode($token), 12);
-    if (!$r['ok']) return $token;
-    $d = json_decode($r['body'], true);
-    if (!is_array($d) || empty($d['access_token'])) return $token;
-    save_setting('instagram_token', (string)$d['access_token']);
-    save_setting('instagram_token_at', (string)time());
-    return (string)$d['access_token'];
-}
-
 /**
- * Trae las publicaciones del origen configurado y las deja en la caché.
- * Si algo falla se conserva lo último que se trajo, para no dejar la portada vacía.
- */
-function instagram_refresh(bool $force = false): array {
-    $cache  = instagram_cache();
-    $source = instagram_source();
-    $last   = max($cache['fetched_at'], $cache['last_try']);
-
-    if (!$force && $last > 0 && (time() - $last) < INSTAGRAM_REFRESH_TTL) {
-        return ['ok' => true, 'error' => '', 'posts' => count($cache['posts']), 'fetched_at' => $cache['fetched_at'], 'skipped' => true];
-    }
-
-    try {
-        if ($source === 'graph') {
-            $token = instagram_token();
-            if ($token === '') throw new RuntimeException('Falta el token de Instagram.');
-            $token = instagram_refresh_token($token);
-            $url   = 'https://graph.instagram.com/v21.0/me/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp'
-                   . '&limit=' . INSTAGRAM_MAX_POSTS . '&access_token=' . rawurlencode($token);
-            $res   = http_get($url, 12);
-            if (!$res['ok'] && $res['body'] === '') throw new RuntimeException($res['error']);
-            $posts = instagram_parse_graph($res['body']);
-        } else {
-            $url = instagram_behold_url();
-            if ($url === '') throw new RuntimeException('Falta la dirección del feed.');
-            $res = http_get($url, 12);
-            if (!$res['ok'] && $res['body'] === '') throw new RuntimeException($res['error']);
-            $posts = instagram_parse_behold($res['body']);
-        }
-
-        if (!$posts) throw new RuntimeException('El origen no devolvió publicaciones.');
-
-        $clean = [];
-        foreach ($posts as $p) {
-            $local = instagram_mirror_image((string)$p['image'], (string)$p['id']);
-            if ($local !== '') $p['image'] = $local;
-            $clean[] = $p;
-            if (count($clean) >= INSTAGRAM_MAX_POSTS) break;
-        }
-
-        $now = time();
-        save_setting('instagram_cache', json_encode(
-            ['fetched_at' => $now, 'last_try' => $now, 'posts' => $clean, 'error' => '', 'source' => $source],
-            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-        ));
-        return ['ok' => true, 'error' => '', 'posts' => count($clean), 'fetched_at' => $now];
-    } catch (Throwable $ex) {
-        $cache['error']    = $ex->getMessage();
-        $cache['source']   = $source;
-        $cache['last_try'] = time();
-        save_setting('instagram_cache', json_encode($cache, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        return ['ok' => false, 'error' => $ex->getMessage(), 'posts' => count($cache['posts']), 'fetched_at' => $cache['fetched_at']];
-    }
-}
-
-/**
- * Publicaciones que pueden ir a la portada, en orden: primero las más recientes.
- * En modo automático son las últimas traídas de Instagram (con los ajustes del panel);
- * en modo manual, las cargadas a mano. Las guardadas antes de existir el mostrar/ocultar
- * y el fijar se toman visibles.
+ * Publicaciones cargadas a mano desde el panel, en orden: primero las más recientes.
+ * Las guardadas antes de existir el mostrar/ocultar y el fijar se toman visibles.
  */
 function instagram_posts(): array {
-    if (instagram_mode() === 'auto') {
-        $over = instagram_overrides();
-        $out  = [];
-        foreach (instagram_cache()['posts'] as $p) {
-            $img = trim((string)($p['image'] ?? ''));
-            if ($img === '') continue;
-            $id = (string)($p['id'] ?? '');
-            $o  = ($id !== '' && is_array($over[$id] ?? null)) ? $over[$id] : [];
-            $out[] = [
-                'id'      => $id,
-                'image'   => $img,
-                'link'    => trim((string)($p['link'] ?? '')),
-                'caption' => trim((string)($p['caption'] ?? '')),
-                'visible' => !array_key_exists('visible', $o) ? true : (bool)$o['visible'],
-                'pinned'  => (bool)($o['pinned'] ?? false),
-            ];
-            if (count($out) >= INSTAGRAM_MAX_POSTS) break;
-        }
-        return $out;
-    }
-
     $list = json_decode(setting('instagram_posts', ''), true);
     if (!is_array($list)) return [];
     $out = [];
@@ -2658,7 +2375,6 @@ function instagram_posts(): array {
         $img = trim((string)($p['image'] ?? ''));
         if ($img === '') continue;
         $out[] = [
-            'id'      => '',
             'image'   => $img,
             'link'    => trim((string)($p['link'] ?? '')),
             'caption' => trim((string)($p['caption'] ?? '')),
