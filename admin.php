@@ -733,6 +733,56 @@ input:checked ~ .confirm-revoke { display:inline; }
 .client-tools details > summary::-webkit-details-marker { display: none; }
 .client-tool-form { margin-top: 16px; background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 20px; max-width: 780px; }
 
+/* ── Buscador de clientes (nombre, correo o teléfono) ───────────────── */
+.client-search { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 20px; }
+.client-search-field { position: relative; flex: 1 1 320px; max-width: 520px; }
+.client-search-field input[type="search"] {
+    width: 100%;
+    margin: 0;
+    padding: 12px 42px 12px 42px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    font-size: 14px;
+    box-shadow: 0 2px 10px #1725300d;
+}
+.client-search-field input[type="search"]:focus { border-color: var(--blue); box-shadow: 0 0 0 3px #39aef233; }
+.client-search-field input[type="search"]::-webkit-search-cancel-button { display: none; }
+.client-search-ico { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--gray); pointer-events: none; }
+.client-search-ico svg { width: 17px; height: 17px; display: block; }
+.client-search-clear {
+    position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+    width: 26px; height: 26px; border: 0; border-radius: 50%;
+    background: #eef2f5; color: var(--gray); font-size: 12px; line-height: 1;
+    display: grid; place-items: center; cursor: pointer;
+}
+.client-search-clear:hover { background: #e1e7ee; color: var(--ink); }
+.client-search-meta { font-size: 13px; color: var(--gray); }
+.client-card.is-hidden { display: none !important; }
+.client-search-empty {
+    background: #f8fafc; border: 1px dashed var(--line); border-radius: 12px;
+    padding: 24px; text-align: center; color: var(--gray); font-size: 14px;
+}
+
+/* ── Modo mantenimiento: botón siempre a la vista ───────────────────── */
+.maint-switch { position: fixed; left: 18px; bottom: 18px; z-index: 60; margin: 0; }
+.maint-switch-btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 11px 16px; border: 1px solid var(--line); border-radius: 999px;
+    background: #fff; color: var(--ink); font-size: 13px; font-weight: 600;
+    box-shadow: 0 8px 22px #1725301f; cursor: pointer;
+}
+.maint-switch-btn:hover { border-color: var(--ink); transform: translateY(-1px); }
+.maint-switch-btn .dot { width: 9px; height: 9px; border-radius: 50%; background: #22c55e; display: block; flex: 0 0 auto; }
+.maint-switch-btn.on { background: #dc2626; border-color: #dc2626; color: #fff; }
+.maint-switch-btn.on .dot { background: #fff; animation: maintPulse 1.6s ease-in-out infinite; }
+@keyframes maintPulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@media (max-width: 640px) {
+    .maint-switch { left: 12px; bottom: 12px; }
+    .maint-switch-btn { padding: 10px 13px; font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .maint-switch-btn.on .dot { animation: none; } }
+
 /* ── Constructor de presupuestos ────────────────────────────────────── */
 .quote-head, .quote-row {
     display: grid;
@@ -974,6 +1024,22 @@ input:checked ~ .confirm-revoke { display:inline; }
             </details>
         </div>
 
+        <?php if ($users): ?>
+        <!-- Buscador: filtra la lista mientras escribís (nombre, correo o teléfono) -->
+        <div class="client-search">
+            <div class="client-search-field">
+                <span class="client-search-ico" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4-4"/></svg>
+                </span>
+                <input type="search" id="client-search" autocomplete="off"
+                       placeholder="Buscar por nombre, correo o teléfono…"
+                       aria-label="Buscar cliente por nombre, correo o teléfono">
+                <button type="button" id="client-search-clear" class="client-search-clear" aria-label="Limpiar la búsqueda" hidden>✕</button>
+            </div>
+            <span class="client-search-meta" id="client-search-count" aria-live="polite"><?= count($users) ?> cliente<?= count($users) === 1 ? '' : 's' ?></span>
+        </div>
+        <?php endif; ?>
+
         <?php
         // Mostrar pendientes primero
         usort($users, fn($a, $b) => (int)$a['wholesale_approved'] - (int)$b['wholesale_approved']);
@@ -988,7 +1054,7 @@ input:checked ~ .confirm-revoke { display:inline; }
             $displayName = e($u['business'] ?: $u['name']);
             $uOrders     = user_orders_count((int)$u['id']);
             ?>
-            <div class="admin-row client-card">
+            <div class="admin-row client-card" data-buscar="<?= e($u['name'] . ' ' . $u['business'] . ' ' . $u['email'] . ' ' . $u['phone']) ?>">
                 <div class="client-card-head">
                     <div class="admin-row-info">
                         <b><?= $displayName ?></b>
@@ -1074,13 +1140,13 @@ input:checked ~ .confirm-revoke { display:inline; }
                 </div>
             </div>
 
-        <?php endforeach; endif; ?>
+        <?php endforeach; ?>
 
-        <div style="margin-top:28px">
-            <a class="btn outline" href="https://ecommerce.hostinger.com/" target="_blank" rel="noopener noreferrer">
-                Gestionar catálogo en la tienda de Hostinger ↗
-            </a>
-        </div>
+            <div class="client-search-empty" id="client-search-empty" hidden>
+                No hay clientes que coincidan con la búsqueda.
+            </div>
+
+        <?php endif; ?>
 
     <!-- ══════════════════════════════════════════════════════════════════
          PESTAÑA: PEDIDOS (ÓRDENES DE COMPRA MAYORISTA)
@@ -1522,7 +1588,7 @@ input:checked ~ .confirm-revoke { display:inline; }
             <div>
                 <h2>Gestión de productos</h2>
                 <p style="margin:0;color:var(--gray);font-size:14px">
-                    Administrá productos locales propios y sincronizados de Hostinger.
+                    Administrá tus productos, precios, stock y visibilidad en la tienda.
                     Los precios solo son visibles para clientes mayoristas verificados.
                 </p>
             </div>
@@ -1543,7 +1609,7 @@ input:checked ~ .confirm-revoke { display:inline; }
 
         <?php if ($adminCatalogError): ?>
             <div class="app-flash error" role="alert" style="margin-bottom:20px">
-                No se pudo conectar con la API de Hostinger. Podés gestionar tus productos locales y los productos con ajustes guardados.
+                No se pudieron cargar los productos sincronizados. Podés gestionar tus productos locales y los productos con ajustes guardados.
             </div>
         <?php endif; ?>
 
@@ -3288,14 +3354,14 @@ input:checked ~ .confirm-revoke { display:inline; }
 
         <hr style="border:none; border-top:1px solid var(--line); margin:0 0 36px">
 
-        <!-- ── MODO MANTENIMIENTO ────────────────────────────────────────── -->
-        <div id="mantenimiento" style="background:<?= setting('maintenance_mode', '0') === '1' ? '#fff1f2' : '#f8fafc' ?>;border:2px solid <?= setting('maintenance_mode', '0') === '1' ? '#f43f5e' : 'var(--line)' ?>;border-radius:14px;padding:24px;margin-bottom:34px;max-width:760px;box-shadow:0 4px 14px rgba(0,0,0,0.03)">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:14px">
+        <!-- ── MODO MANTENIMIENTO (se maneja con el botón siempre visible, abajo a la izquierda) ── -->
+        <div id="mantenimiento" style="background:<?= setting('maintenance_mode', '0') === '1' ? '#fff1f2' : '#f8fafc' ?>;border:2px solid <?= setting('maintenance_mode', '0') === '1' ? '#f43f5e' : 'var(--line)' ?>;border-radius:14px;padding:22px;margin-bottom:34px;max-width:760px;box-shadow:0 4px 14px rgba(0,0,0,0.03)">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px">
                 <div style="display:flex;align-items:center;gap:10px">
-                    <span style="font-size:26px">🛠️</span>
+                    <span style="font-size:24px">🛠️</span>
                     <div>
                         <h2 style="margin:0;font-size:19px;color:var(--ink)">Modo Mantenimiento</h2>
-                        <span style="font-size:12px;color:var(--gray)">Control de acceso y visibilidad pública de la tienda</span>
+                        <span style="font-size:12px;color:var(--gray)">Se activa y desactiva con el botón de abajo a la izquierda, siempre a la vista.</span>
                     </div>
                 </div>
                 <div>
@@ -3307,29 +3373,10 @@ input:checked ~ .confirm-revoke { display:inline; }
                 </div>
             </div>
 
-            <p style="font-size:13.5px;color:var(--ink);line-height:1.55;margin-bottom:18px">
-                Al activar el modo mantenimiento, cualquier persona o cliente que visite la tienda verá exclusivamente una pantalla limpia con el <strong>logo del negocio</strong> y un <strong>botón que abre el modal con los datos de contacto de emergencia</strong> (WhatsApp directo, dirección física en San Vicente e Instagram).
-                <br>
-                <span style="color:#64748b;font-size:12.5px;display:inline-block;margin-top:4px">
-                    🔒 <strong>Acceso restringido:</strong> Solo las cuentas con <strong>rol de administrador</strong> pueden ver y navegar el sitio completo mientras este modo esté activado.
-                </span>
+            <p style="font-size:13px;color:var(--gray);line-height:1.6;margin:16px 0 0">
+                Mientras esté activo, quien visite la tienda ve una pantalla limpia con el <strong>logo del negocio</strong> y un <strong>botón con los datos de contacto de emergencia</strong> (WhatsApp directo, dirección física en San Vicente e Instagram).
+                Sólo las cuentas con <strong>rol de administrador</strong> siguen viendo y navegando el sitio completo.
             </p>
-
-            <form method="post" style="margin:0">
-                <?= csrf_field() ?>
-                <input type="hidden" name="act"  value="toggle_maintenance">
-                <input type="hidden" name="_tab" value="configuracion">
-
-                <?php if (setting('maintenance_mode', '0') === '1'): ?>
-                    <button class="btn btn-small" type="submit" style="background:#16a34a;color:#fff;border:none;font-weight:700;padding:12px 22px;border-radius:8px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;gap:8px">
-                        ✓ Desactivar modo mantenimiento y abrir el sitio
-                    </button>
-                <?php else: ?>
-                    <button class="btn btn-small" type="submit" onclick="return confirm('¿Confirmás activar el modo mantenimiento? Los clientes solo verán el logo y botón de emergencia hasta que lo desactives.')" style="background:#dc2626;color:#fff;border:none;font-weight:700;padding:12px 22px;border-radius:8px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;gap:8px">
-                        ⚠️ Activar modo mantenimiento
-                    </button>
-                <?php endif; ?>
-            </form>
         </div>
 
         <hr style="border:none; border-top:1px solid var(--line); margin:36px 0 28px">
@@ -3483,16 +3530,6 @@ input:checked ~ .confirm-revoke { display:inline; }
             <button class="btn yellow" type="submit" style="margin-top:16px">Guardar datos bancarios</button>
         </form>
 
-        <div class="system-note" style="margin-top:40px; border-radius:8px">
-            <b>Gestión de productos y stock</b>
-            <p style="margin:8px 0 12px; color:var(--gray); font-size:14px">
-                Los productos, el stock y los pedidos se administran en la tienda de Hostinger conectada al sitio.
-            </p>
-            <a class="btn yellow" href="https://ecommerce.hostinger.com/" target="_blank" rel="noopener noreferrer">
-                Ir a la tienda de Hostinger ↗
-            </a>
-        </div>
-
     <?php else: ?>
         <div class="system-note" style="border-radius:8px">
             <b>Tu usuario todavía no tiene secciones habilitadas.</b>
@@ -3503,6 +3540,75 @@ input:checked ~ .confirm-revoke { display:inline; }
         </div>
     <?php endif; ?>
 
+    <?php if (can('configuracion')):
+        $mantOn = setting('maintenance_mode', '0') === '1'; ?>
+    <!-- Modo mantenimiento: botón siempre a la vista, en todas las pestañas -->
+    <form method="post" class="maint-switch">
+        <?= csrf_field() ?>
+        <input type="hidden" name="act"  value="toggle_maintenance">
+        <input type="hidden" name="_tab" value="<?= e($tab) ?>">
+        <button type="submit" class="maint-switch-btn<?= $mantOn ? ' on' : '' ?>"
+                title="<?= e($mantOn ? 'Volver a abrir el sitio al público' : 'Pausar el sitio y mostrar sólo la pantalla de mantenimiento') ?>"
+                <?php if (!$mantOn): ?>onclick="return confirm('¿Activar el modo mantenimiento? Los visitantes sólo verán el logo y el botón de contacto de emergencia hasta que lo desactives.')"<?php endif; ?>>
+            <span class="dot" aria-hidden="true"></span>
+            <?= $mantOn ? 'Mantenimiento activo · desactivar' : 'Activar modo mantenimiento' ?>
+        </button>
+    </form>
+    <?php endif; ?>
+
 </main>
+
+<script>
+/* Buscador de clientes: filtra la lista mientras escribís, por nombre, correo o teléfono. */
+(function () {
+    var input = document.getElementById('client-search');
+    if (!input) return;
+
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.client-card'));
+    var clear = document.getElementById('client-search-clear');
+    var count = document.getElementById('client-search-count');
+    var empty = document.getElementById('client-search-empty');
+    var total = cards.length;
+
+    /* Saca acentos y mayúsculas para que "muñoz" encuentre a "Muñoz" */
+    function normalizar(txt) {
+        txt = (txt || '').toString().toLowerCase();
+        try { txt = txt.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {}
+        return txt.replace(/[^a-z0-9@.+-]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    function soloNumeros(txt) { return (txt || '').replace(/[^0-9]/g, ''); }
+
+    function filtrar() {
+        var texto  = normalizar(input.value);
+        var numero = soloNumeros(texto);
+        var visibles = 0;
+
+        cards.forEach(function (card) {
+            var dato = normalizar(card.getAttribute('data-buscar'));
+            var coincide = texto === '' || dato.indexOf(texto) >= 0;
+            /* También busca por teléfono aunque tenga espacios, guiones o el 0/54 adelante */
+            if (!coincide && numero.length >= 3) coincide = soloNumeros(dato).indexOf(numero) >= 0;
+            card.classList.toggle('is-hidden', !coincide);
+            if (coincide) visibles++;
+        });
+
+        if (clear) clear.hidden = texto === '';
+        if (empty) empty.hidden = visibles > 0;
+        if (count) {
+            count.textContent = texto === ''
+                ? total + (total === 1 ? ' cliente' : ' clientes')
+                : visibles + ' de ' + total + (visibles === 1 ? ' cliente' : ' clientes');
+        }
+    }
+
+    input.addEventListener('input', filtrar);
+    input.addEventListener('search', filtrar);
+    input.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') { input.value = ''; filtrar(); }
+    });
+    if (clear) clear.addEventListener('click', function () { input.value = ''; filtrar(); input.focus(); });
+    filtrar();
+})();
+</script>
 
 <?php site_footer(); ?>
