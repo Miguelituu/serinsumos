@@ -868,7 +868,7 @@ function site_header(string $title = '', string $description = ''): void {
     <meta name="theme-color" content="#172530">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.6">
+    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.7">
     <link rel="icon" href="<?= e($favicon) ?>">
     <link rel="shortcut icon" href="<?= e($favicon) ?>">
     <script>document.documentElement.className += ' has-js';</script>
@@ -915,7 +915,7 @@ function site_header(string $title = '', string $description = ''): void {
         <nav id="main-nav" class="main-nav" aria-label="Navegación principal">
             <a href="<?= e(site_url('index.php')) ?>" class="<?= $currentScript === 'index.php' ? 'active' : '' ?>">Inicio</a>
             <a href="<?= e(site_url('catalogo.php')) ?>" class="<?= $currentScript === 'catalogo.php' ? 'active' : '' ?>">Tienda</a>
-            <a href="<?= e(site_url('index.php#mayoristas')) ?>">Mayoristas</a>
+            <a href="<?= e(site_url('mayoristas.php')) ?>" class="<?= $currentScript === 'mayoristas.php' ? 'active' : '' ?>">Mayoristas</a>
             <a href="<?= e(site_url('nosotros.php')) ?>" class="<?= $currentScript === 'nosotros.php' ? 'active' : '' ?>">Nosotros</a>
             <a href="<?= e(site_url('contacto.php')) ?>" class="<?= $currentScript === 'contacto.php' ? 'active' : '' ?>">Contacto</a>
             <a href="https://www.instagram.com/ser.insumos/" target="_blank" rel="noopener noreferrer">Instagram</a>
@@ -953,7 +953,7 @@ function site_header(string $title = '', string $description = ''): void {
     <div class="mobile-drawer-links">
         <a href="<?= e(site_url('index.php')) ?>" class="<?= $currentScript === 'index.php' ? 'active' : '' ?>">🏠 Inicio</a>
         <a href="<?= e(site_url('catalogo.php')) ?>" class="<?= $currentScript === 'catalogo.php' ? 'active' : '' ?>">📦 Tienda / Catálogo</a>
-        <a href="<?= e(site_url('index.php#mayoristas')) ?>">💼 Venta Mayorista</a>
+        <a href="<?= e(site_url('mayoristas.php')) ?>" class="<?= $currentScript === 'mayoristas.php' ? 'active' : '' ?>">💼 Venta Mayorista</a>
         <a href="<?= e(site_url('nosotros.php')) ?>">👥 Nosotros</a>
         <a href="<?= e(site_url('contacto.php')) ?>" class="<?= $currentScript === 'contacto.php' ? 'active' : '' ?>">💬 Contacto / Ubicación</a>
         <a href="<?= e(site_url('cuenta.php')) ?>">👤 Mi cuenta mayorista</a>
@@ -1004,7 +1004,7 @@ function site_footer(): void {
         <div class="footer-col-links">
             <h4>Navegación</h4>
             <a href="<?= e(site_url('catalogo.php')) ?>">Catálogo de productos</a>
-            <a href="<?= e(site_url('index.php#mayoristas')) ?>">Cómo comprar mayorista</a>
+            <a href="<?= e(site_url('mayoristas.php')) ?>">Cómo comprar mayorista</a>
             <a href="<?= e(site_url('nosotros.php')) ?>">Sobre Serinsumos</a>
             <a href="<?= e(site_url('carrito.php')) ?>">Mi pedido</a>
         </div>
@@ -1100,6 +1100,53 @@ function site_footer(): void {
         window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
         btn.blur();
     });
+})();
+</script>
+
+<script>
+/* Línea superior del footer: el color recorre la paleta de la marca al hacer scroll.
+   La fase depende de la posición, así que baja un color al bajar y lo devuelve al subir. */
+(function () {
+    var root = document.documentElement;
+    if (!root || !window.requestAnimationFrame) return;
+
+    var PALETA = [
+        [57, 174, 242],   /* azul     #39aef2 */
+        [237, 50, 133],   /* rosa     #ed3285 */
+        [255, 231, 46],   /* amarillo #ffe72e */
+        [237, 50, 133],   /* rosa     #ed3285 */
+        [57, 174, 242]    /* vuelve al azul (sin pasar por el verde) */
+    ];
+    var TRAMOS = PALETA.length - 1;
+    var CICLO = 1.5;      /* vueltas de paleta por cada altura de pantalla recorrida */
+    var frame = 0;
+
+    function mezcla(a, b, t) {
+        return 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * t) + ',' +
+                        Math.round(a[1] + (b[1] - a[1]) * t) + ',' +
+                        Math.round(a[2] + (b[2] - a[2]) * t) + ')';
+    }
+    function colorDe(fase) {
+        var x = (fase - Math.floor(fase)) * TRAMOS;
+        var i = Math.floor(x);
+        if (i > TRAMOS - 1) i = TRAMOS - 1;
+        return mezcla(PALETA[i], PALETA[i + 1], x - i);
+    }
+    function pintar() {
+        frame = 0;
+        var y = window.pageYOffset || root.scrollTop || 0;
+        var alto = window.innerHeight || 800;
+        root.style.setProperty('--footer-line', colorDe(y / (alto * CICLO)));
+    }
+    function pedirPintado() {
+        if (frame) return;
+        /* requestAnimationFrame no corre en pestañas ocultas: ahí pintamos al instante */
+        if (document.hidden) { pintar(); return; }
+        frame = window.requestAnimationFrame(pintar);
+    }
+    window.addEventListener('scroll', pedirPintado, { passive: true });
+    window.addEventListener('resize', pedirPintado, { passive: true });
+    pintar();
 })();
 </script>
 </body>

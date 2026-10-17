@@ -492,7 +492,7 @@ body{min-height:100vh}body>#root{min-height:100vh}.mobile-menu{display:none;bord
 .footer-main {
     background: #0f1820;
     color: #cbd5e1;
-    border-top: 4px solid var(--blue);
+    border-top: 4px solid var(--footer-line, var(--blue));
     padding: 60px 5% 30px;
     margin-top: 60px;
 }
@@ -1189,6 +1189,15 @@ html { overflow-x: clip; }
 .home-value .icon svg { width: 30px; height: 30px; display: block; }
 .home-value h3 { font-size: 18px; margin: 0 0 8px; }
 .home-value p { margin: 0; color: var(--gray); font-size: 14px; line-height: 1.6; }
+.home-values-cta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 40px;
+}
+.home-values-cta .btn { margin: 0; }
 
 /* ── HOME: últimas publicaciones de Instagram ─────────────────────────── */
 .home-insta {
