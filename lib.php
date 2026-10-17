@@ -719,9 +719,10 @@ function site_header(string $title = '', string $description = ''): void {
     <meta name="theme-color" content="#172530">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.1">
+    <link rel="stylesheet" href="<?= e(site_url('assets/site.css')) ?>?v=2.2">
     <link rel="icon" href="<?= e($favicon) ?>">
     <link rel="shortcut icon" href="<?= e($favicon) ?>">
+    <script>document.documentElement.className += ' has-js';</script>
     <style>
         /* Overlay de carga: CSS critico en linea para que se vea bien aunque site.css tarde en cargar */
         #site-loader{position:fixed;inset:0;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:#ffffff;transition:opacity .45s ease,visibility .45s ease}
@@ -896,6 +897,8 @@ function site_footer(): void {
         if (done) return;
         done = true;
         loader.classList.add('site-loader--hidden');
+        /* Avisa al resto del sitio (p. ej. el hero) que ya puede animar la entrada */
+        try { document.dispatchEvent(new Event('site:loaderhidden')); } catch (e) {}
         window.setTimeout(function () {
             if (loader.parentNode) loader.parentNode.removeChild(loader);
         }, 500);

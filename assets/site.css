@@ -769,3 +769,215 @@ html { overflow-x: clip; }
         font-size: 15px !important;
     }
 }
+
+
+/* ==========================================================================
+   HERO PRO: slider con Ken Burns, entrada escalonada, progreso y swipe
+   (al final a proposito: gana en cascada sobre las reglas base del hero)
+   ========================================================================== */
+
+.hero { isolation: isolate; }
+
+/* Fondo animado detras de la imagen */
+.hero .hero-bg {
+    position: absolute;
+    inset: -25%;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(38% 42% at 18% 26%, rgba(255,255,255,.30), rgba(255,255,255,0) 70%),
+        radial-gradient(42% 48% at 82% 74%, rgba(57,174,242,.45), rgba(57,174,242,0) 72%),
+        radial-gradient(30% 34% at 68% 16%, rgba(237,50,133,.38), rgba(237,50,133,0) 70%);
+    animation: heroDrift 16s ease-in-out infinite alternate;
+}
+
+@keyframes heroDrift {
+    0%   { transform: translate3d(-2.5%,-1.5%,0) scale(1.05); }
+    100% { transform: translate3d(2.5%,2%,0) scale(1.16); }
+}
+
+.hero .hero-photo {
+    z-index: 1;
+    overflow: hidden;
+    border-radius: 16px;
+}
+
+.hero .hero-photo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(10,20,28,.16), rgba(10,20,28,0) 32%, rgba(10,20,28,.22));
+}
+
+.hero .hero-photo .hero-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    will-change: transform, opacity;
+}
+
+.hero > .hero-copy { z-index: 2; }
+.hero > .hero-bottom { z-index: 3; }
+
+/* Crossfade + Ken Burns */
+.has-js .hero .hero-img { opacity: 0; transition: opacity 1.05s ease; }
+.has-js .hero .hero-img.is-active { opacity: 1; animation: heroKenBurns 9s ease-out both; }
+
+@keyframes heroKenBurns {
+    0%   { transform: scale(1.12); }
+    100% { transform: scale(1); }
+}
+
+/* Titulo: reveal linea por linea */
+.hero-title .hero-line { display: block; overflow: hidden; padding-bottom: .16em; margin-bottom: -.16em; }
+.hero-title .hero-line-inner { display: block; }
+.hero-title .hero-line,
+.hero-title .hero-line-inner { color: inherit; }
+
+.has-js .hero.hero-anim .hero-title .hero-line-inner {
+    animation: heroLineIn .95s cubic-bezier(.16,1,.3,1) both;
+    animation-delay: calc(.22s + var(--i, 0) * .11s);
+}
+
+@keyframes heroLineIn {
+    0%   { transform: translateY(114%); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+
+/* Resto del texto: sube con retardo escalonado */
+.has-js .hero.hero-anim .hero-copy .eyebrow { animation: heroRise .70s cubic-bezier(.22,.61,.36,1) .10s both; }
+.has-js .hero.hero-anim .hero-copy .hero-description { animation: heroRise .75s cubic-bezier(.22,.61,.36,1) .48s both; }
+.has-js .hero.hero-anim .hero-copy .hero-buttons { animation: heroRise .75s cubic-bezier(.22,.61,.36,1) .62s both; }
+.has-js .hero.hero-anim .hero-copy .hero-proof { animation: heroRise .75s cubic-bezier(.22,.61,.36,1) .74s both; }
+
+@keyframes heroRise {
+    0%   { opacity: 0; transform: translateY(24px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Salida del texto al cambiar de slide */
+.has-js .hero.hero-leaving .hero-copy .eyebrow,
+.has-js .hero.hero-leaving .hero-copy .hero-description,
+.has-js .hero.hero-leaving .hero-copy .hero-buttons,
+.has-js .hero.hero-leaving .hero-copy .hero-proof {
+    opacity: 0;
+    transform: translateY(-14px);
+    transition: opacity .24s ease, transform .24s ease;
+}
+
+.has-js .hero.hero-leaving .hero-title .hero-line-inner {
+    opacity: 0;
+    transform: translateY(-46%);
+    transition: opacity .24s ease, transform .24s ease;
+}
+
+/* Botones: brillo diagonal + flecha que se desliza */
+.hero .btn.yellow { position: relative; overflow: hidden; }
+
+.hero .btn.yellow::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -140%;
+    width: 60%;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,.7), transparent);
+    transform: skewX(-18deg);
+    transition: left .65s ease;
+    pointer-events: none;
+}
+
+.hero .btn.yellow:hover::after { left: 150%; }
+.hero .hero-btn-arrow { transition: transform .25s ease; }
+.hero .btn.yellow:hover .hero-btn-arrow { transform: translateX(4px); }
+
+.hero .hero-secondary { transition: gap .25s ease, opacity .25s ease; }
+.hero .hero-secondary:hover { gap: 17px; opacity: .92; }
+
+/* Navegacion: puntos, flechas y contador */
+.hero .hero-dots { display: flex; align-items: center; gap: 10px; }
+
+.hero .hero-dots .hero-dot {
+    display: block;
+    width: 9px;
+    height: 9px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255,255,255,.42);
+    transition: width .28s ease, background .28s ease, border-radius .28s ease;
+}
+
+.hero .hero-dots .hero-dot:hover { background: rgba(255,255,255,.8); }
+.hero .hero-dots .hero-dot.is-active { width: 26px; border-radius: 6px; background: var(--yellow); }
+
+.hero .hero-nav { display: flex; align-items: center; gap: 18px; }
+
+.hero .hero-bottom .hero-arrow { transition: background .2s ease, border-color .2s ease, transform .2s ease; }
+.hero .hero-bottom .hero-arrow:hover { background: rgba(255,255,255,.16); border-color: #fff; transform: scale(1.06); }
+
+/* Barra de progreso del autoplay */
+.hero .hero-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    z-index: 4;
+    background: rgba(255,255,255,.18);
+    overflow: hidden;
+}
+
+.hero .hero-progress > span {
+    display: block;
+    height: 100%;
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: left center;
+    background: var(--yellow);
+}
+
+.hero.is-playing .hero-progress > span {
+    animation: heroProgress linear forwards;
+    animation-duration: var(--hero-duration, 7.5s);
+}
+
+.hero.is-paused .hero-progress > span { animation-play-state: paused; }
+
+@keyframes heroProgress {
+    0%   { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+}
+
+/* Movimiento reducido: sin animaciones, contenido siempre visible */
+@media (prefers-reduced-motion: reduce) {
+    .hero .hero-bg { animation: none; }
+    .has-js .hero .hero-img { opacity: 0; transition: none; }
+    .has-js .hero .hero-img.is-active { opacity: 1; animation: none; }
+
+    .has-js .hero.hero-anim .hero-title .hero-line-inner,
+    .has-js .hero.hero-anim .hero-copy .eyebrow,
+    .has-js .hero.hero-anim .hero-copy .hero-description,
+    .has-js .hero.hero-anim .hero-copy .hero-buttons,
+    .has-js .hero.hero-anim .hero-copy .hero-proof { animation: none; opacity: 1; transform: none; }
+
+    .has-js .hero.hero-leaving .hero-title .hero-line-inner,
+    .has-js .hero.hero-leaving .hero-copy .eyebrow,
+    .has-js .hero.hero-leaving .hero-copy .hero-description,
+    .has-js .hero.hero-leaving .hero-copy .hero-buttons,
+    .has-js .hero.hero-leaving .hero-copy .hero-proof { opacity: 1; transform: none; transition: none; }
+
+    .hero .hero-progress { display: none; }
+}
+
+@media (max-width: 650px) {
+    .hero .hero-dots { gap: 8px; }
+    .hero .hero-dots .hero-dot { width: 8px; height: 8px; }
+    .hero .hero-dots .hero-dot.is-active { width: 22px; }
+    .hero .hero-nav { gap: 12px; }
+    .hero .hero-photo { border-radius: 12px; }
+}

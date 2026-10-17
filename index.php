@@ -23,23 +23,26 @@ $firstBanner = $banners[0];
 $totalBanners = count($banners);
 ?>
 <main>
-<section class="hero">
+<section class="hero" id="hero" aria-roledescription="carrusel" aria-label="Destacados de Serinsumos">
+    <div class="hero-bg" aria-hidden="true"></div>
     <div class="hero-photo">
-        <img id="hero-slide" src="<?= e($firstBanner['image_url']) ?>" alt="Insumos y herramientas para sublimación">
+        <img class="hero-img" id="hero-img-a" src="<?= e($firstBanner['image_url']) ?>" alt="<?= e(trim(strip_tags($firstBanner['title'] ?? '')) ?: 'Insumos y herramientas para sublimación') ?>" fetchpriority="high" decoding="async">
+        <img class="hero-img" id="hero-img-b" alt="" aria-hidden="true" decoding="async">
     </div>
-    <div class="hero-copy">
+    <div class="hero-copy" id="hero-copy">
         <p class="eyebrow" id="hero-eyebrow"><?= e($firstBanner['eyebrow'] ?: 'EL COLOR ES SOLO EL COMIENZO') ?></p>
-        <h1 id="hero-title"><?= ($firstBanner['title'] ?: 'Todo para crear.<br>Todo para <span>crecer.</span>') ?></h1>
-        <p class="hero-description" id="hero-description"><?= nl2br(e($firstBanner['description'])) ?></p>
+        <h1 class="hero-title" id="hero-title"><?= ($firstBanner['title'] ?: 'Todo para crear.<br>Todo para <span>crecer.</span>') ?></h1>
+        <p class="hero-description" id="hero-description"><?= nl2br(preg_replace('~&lt;br\s*/?&gt;~i', '<br>', e($firstBanner['description']))) ?></p>
         <div class="hero-buttons">
             <?php if (!empty($firstBanner['button_primary_text'])): ?>
                 <a class="btn yellow" id="hero-btn-primary" href="<?= e(preg_match('~^https?://~i', $firstBanner['button_primary_link']) ? $firstBanner['button_primary_link'] : site_url($firstBanner['button_primary_link'] ?: 'catalogo.php')) ?>">
-                    <span id="hero-btn-primary-text"><?= e($firstBanner['button_primary_text']) ?></span> <span>→</span>
+                    <span id="hero-btn-primary-text"><?= e($firstBanner['button_primary_text']) ?></span> <span class="hero-btn-arrow" aria-hidden="true">→</span>
                 </a>
             <?php endif; ?>
             <?php if (!empty($firstBanner['button_secondary_text'])): ?>
                 <a class="hero-secondary" id="hero-btn-secondary" href="<?= e(preg_match('~^https?://~i', $firstBanner['button_secondary_link']) ? $firstBanner['button_secondary_link'] : site_url($firstBanner['button_secondary_link'] ?: 'cuenta.php?registro=1')) ?>">
-                    <span id="hero-btn-secondary-text"><?= e($firstBanner['button_secondary_text']) ?></span> →
+                    <span id="hero-btn-secondary-text"><?= e($firstBanner['button_secondary_text']) ?></span>
+                    <span class="hero-btn-arrow" aria-hidden="true">→</span>
                 </a>
             <?php endif; ?>
         </div>
@@ -48,13 +51,17 @@ $totalBanners = count($banners);
     <div class="hero-bottom">
         <span>INSUMOS · TECNOLOGÍA · POSIBILIDADES</span>
         <?php if ($totalBanners > 1): ?>
-        <div>
-            <button type="button" aria-label="Imagen anterior" onclick="heroSlide(-1)">‹</button>
+        <div class="hero-dots" id="hero-dots" role="tablist" aria-label="Seleccionar diapositiva"></div>
+        <div class="hero-nav">
+            <button type="button" class="hero-arrow" aria-label="Foto anterior" onclick="heroSlide(-1)">‹</button>
             <b id="hero-number">01<small> / <?= sprintf('%02d', $totalBanners) ?></small></b>
-            <button type="button" aria-label="Imagen siguiente" onclick="heroSlide(1)">›</button>
+            <button type="button" class="hero-arrow" aria-label="Foto siguiente" onclick="heroSlide(1)">›</button>
         </div>
         <?php endif; ?>
     </div>
+    <?php if ($totalBanners > 1): ?>
+    <div class="hero-progress" aria-hidden="true"><span></span></div>
+    <?php endif; ?>
 </section>
 <section class="categories"><div class="category-intro"><small>ENCONTRÁ LO QUE NECESITÁS</small><h2>Tu mundo,<br>a todo color.</h2></div><a href="<?= e(site_url('catalogo.php?categoria=textiles-para-estampar')) ?>"><span class="category-icon">♧</span><span>Textiles para estampar</span><span class="category-arrow">↗</span></a><a href="<?= e(site_url('catalogo.php?categoria=pad-gamer-pad-mouse')) ?>"><span class="category-icon">▣</span><span>Pad gamer & mouse</span><span class="category-arrow">↗</span></a><a href="<?= e(site_url('catalogo.php?categoria=accesorios-y-regalos-para-sublimar')) ?>"><span class="category-icon">☕</span><span>Regalos y accesorios</span><span class="category-arrow">↗</span></a><a href="<?= e(site_url('catalogo.php?categoria=packaging-bolsas-cajas-y-cartulina')) ?>"><span class="category-icon">▤</span><span>Packaging y bolsas</span><span class="category-arrow">↗</span></a><a href="<?= e(site_url('catalogo.php?categoria=impresoras-sublimadoras-y-consumibles')) ?>"><span class="category-icon">◉</span><span>Equipos y consumibles</span><span class="category-arrow">↗</span></a></section>
 <section class="products"><div class="section-heading"><div><p class="eyebrow blue">EQUIPÁ TU PRÓXIMO PROYECTO</p><h2>Elegidos para crear.</h2></div><a href="<?= e(site_url('catalogo.php')) ?>">Ver todos los productos →</a></div><?php if (!empty($catalog['error']) && !$products): ?><p class="system-note">No pudimos cargar el catálogo ahora. Revisá la conexión con la tienda online de Hostinger.</p><?php elseif (!$products): ?><p>Próximamente vas a encontrar nuestros productos en el catálogo.</p><?php else: ?><div class="product-grid"><?php foreach (array_slice($products, 0, 4) as $p) render_product_card($p); ?></div><?php endif; ?></section>
@@ -63,57 +70,268 @@ $totalBanners = count($banners);
 <section class="faq"><p class="eyebrow blue">ANTES DE EMPEZAR</p><h2>Resolvemos tus dudas.</h2><details><summary>¿Por qué no puedo ver los precios?</summary><p>Los precios se muestran a clientes con cuenta mayorista aprobada. Registrate y esperá nuestra revisión.</p></details><details><summary>¿Cuándo tengo que pagar?</summary><p>No transfieras antes de que confirmemos el stock y el importe final. Te habilitaremos la carga del comprobante en tu cuenta.</p></details><details><summary>¿Puedo comprar por WhatsApp?</summary><p>Sí. Podés consultar por un producto o enviar el detalle de tu pedido para coordinar la compra.</p></details></section>
 </main>
 <script>
-const heroBanners = <?= json_encode($banners, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
-let heroIndex = 0;
-const totalBanners = heroBanners.length;
+(function () {
+    var hero = document.getElementById('hero');
+    if (!hero) return;
 
-function heroSlide(direction) {
-    if (totalBanners <= 1) return;
-    heroIndex = (heroIndex + direction + totalBanners) % totalBanners;
-    const b = heroBanners[heroIndex];
+    var banners = <?= json_encode($banners, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+    if (!banners || !banners.length) return;
 
-    const imgEl = document.getElementById('hero-slide');
-    if (imgEl && b.image_url) imgEl.src = b.image_url;
+    var total = banners.length;
+    var DURATION = 7500;
 
-    const numEl = document.getElementById('hero-number');
-    if (numEl) numEl.innerHTML = String(heroIndex + 1).padStart(2, '0') + '<small> / ' + String(totalBanners).padStart(2, '0') + '</small>';
+    var imgA = document.getElementById('hero-img-a');
+    var imgB = document.getElementById('hero-img-b');
+    var titleEl = document.getElementById('hero-title');
+    var eyebrowEl = document.getElementById('hero-eyebrow');
+    var descEl = document.getElementById('hero-description');
+    var btnPrimary = document.getElementById('hero-btn-primary');
+    var btnPrimaryText = document.getElementById('hero-btn-primary-text');
+    var btnSecondary = document.getElementById('hero-btn-secondary');
+    var btnSecondaryText = document.getElementById('hero-btn-secondary-text');
+    var numEl = document.getElementById('hero-number');
+    var dotsEl = document.getElementById('hero-dots');
+    var barEl = hero.querySelector('.hero-progress > span');
 
-    const eyebrowEl = document.getElementById('hero-eyebrow');
-    if (eyebrowEl && b.eyebrow !== undefined) eyebrowEl.textContent = b.eyebrow;
+    var index = 0;
+    var activeImg = imgA;
+    var started = false;
+    var animTimer = null;
+    var autoTimer = null;
+    var slideStart = 0;
+    var remaining = DURATION;
+    var paused = false;
 
-    const titleEl = document.getElementById('hero-title');
-    if (titleEl && b.title !== undefined) titleEl.innerHTML = b.title;
+    var reduceMotion = false;
+    try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
-    const descEl = document.getElementById('hero-description');
-    if (descEl && b.description !== undefined) descEl.textContent = b.description;
+    var rawTitle = (banners[0] && banners[0].title) || (titleEl ? titleEl.innerHTML : '');
+    var canHover = false;
+    try { canHover = window.matchMedia('(hover: hover)').matches; } catch (e) {}
 
-    const btnPrimary = document.getElementById('hero-btn-primary');
-    const btnPrimaryText = document.getElementById('hero-btn-primary-text');
-    if (btnPrimary && btnPrimaryText) {
-        if (b.button_primary_text) {
-            btnPrimary.style.display = '';
-            btnPrimaryText.textContent = b.button_primary_text;
-            btnPrimary.href = b.button_primary_link || 'catalogo.php';
-        } else {
-            btnPrimary.style.display = 'none';
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function now() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
+
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function nl2br(s) {
+        return esc(s)
+            .replace(/&lt;br\s*\/?&gt;/gi, '<br>')
+            .replace(/\r\n|\r|\n/g, '<br>');
+    }
+
+    /* Divide el titulo en lineas para revelarlas una por una */
+    function renderTitle(html) {
+        if (!titleEl) return;
+        var parts = String(html == null ? '' : html).split(/<br\s*\/?>/i);
+        var out = '';
+        for (var i = 0; i < parts.length; i++) {
+            out += '<span class="hero-line"><span class="hero-line-inner" style="--i:' + i + '">' + parts[i] + '</span></span>';
+        }
+        titleEl.innerHTML = out;
+    }
+
+    function renderCopy(b) {
+        if (eyebrowEl && b.eyebrow !== undefined) eyebrowEl.textContent = b.eyebrow || '';
+        renderTitle(b.title !== undefined ? b.title : rawTitle);
+        if (descEl && b.description !== undefined) descEl.innerHTML = nl2br(b.description);
+
+        if (btnPrimary && btnPrimaryText) {
+            if (b.button_primary_text) {
+                btnPrimary.style.display = '';
+                btnPrimaryText.textContent = b.button_primary_text;
+                btnPrimary.href = b.button_primary_link || 'catalogo.php';
+            } else {
+                btnPrimary.style.display = 'none';
+            }
+        }
+        if (btnSecondary && btnSecondaryText) {
+            if (b.button_secondary_text) {
+                btnSecondary.style.display = '';
+                btnSecondaryText.textContent = b.button_secondary_text;
+                btnSecondary.href = b.button_secondary_link || 'cuenta.php?registro=1';
+            } else {
+                btnSecondary.style.display = 'none';
+            }
         }
     }
 
-    const btnSecondary = document.getElementById('hero-btn-secondary');
-    const btnSecondaryText = document.getElementById('hero-btn-secondary-text');
-    if (btnSecondary && btnSecondaryText) {
-        if (b.button_secondary_text) {
-            btnSecondary.style.display = '';
-            btnSecondaryText.textContent = b.button_secondary_text;
-            btnSecondary.href = b.button_secondary_link || 'cuenta.php?registro=1';
-        } else {
-            btnSecondary.style.display = 'none';
+    function updateChrome() {
+        if (numEl) numEl.innerHTML = pad(index + 1) + '<small> / ' + pad(total) + '</small>';
+        if (dotsEl) {
+            for (var i = 0; i < dotsEl.children.length; i++) {
+                var on = i === index;
+                dotsEl.children[i].classList.toggle('is-active', on);
+                dotsEl.children[i].setAttribute('aria-selected', on ? 'true' : 'false');
+            }
         }
     }
-}
 
-if (totalBanners > 1) {
-    setInterval(() => { heroSlide(1); }, 7500);
-}
+    /* Cambia la imagen con crossfade + Ken Burns usando dos capas */
+    function showImage(url, immediate) {
+        if (!url || !imgA || !imgB) return;
+        if (immediate) {
+            if (imgA.getAttribute('src') !== url) imgA.src = url;
+            imgA.classList.add('is-active');
+            activeImg = imgA;
+            return;
+        }
+        var incoming = (activeImg === imgA) ? imgB : imgA;
+        var outgoing = activeImg;
+        var go = function () {
+            incoming.classList.add('is-active');
+            outgoing.classList.remove('is-active');
+            activeImg = incoming;
+        };
+        incoming.onload = go;
+        incoming.onerror = go;
+        incoming.src = url;
+        if (incoming.complete && incoming.naturalWidth) go();
+    }
+
+    function preload(url) { if (url) { var im = new Image(); im.src = url; } }
+
+    function restartProgress() {
+        if (!barEl || total <= 1 || reduceMotion) return;
+        hero.classList.remove('is-playing');
+        void barEl.offsetWidth;
+        hero.classList.add('is-playing');
+    }
+
+    function scheduleNext(ms) {
+        window.clearTimeout(autoTimer);
+        if (total <= 1 || reduceMotion) return;
+        remaining = (typeof ms === 'number') ? ms : DURATION;
+        slideStart = now();
+        autoTimer = window.setTimeout(function () { goTo(index + 1); }, remaining);
+    }
+
+    function pauseAuto() {
+        if (!started || total <= 1 || reduceMotion || paused) return;
+        paused = true;
+        window.clearTimeout(autoTimer);
+        remaining -= (now() - slideStart);
+        if (remaining < 800) remaining = 800;
+        hero.classList.add('is-paused');
+    }
+
+    function resumeAuto() {
+        if (total <= 1 || reduceMotion || !paused) return;
+        paused = false;
+        hero.classList.remove('is-paused');
+        scheduleNext(remaining);
+    }
+
+    /* Reinicia la animacion de entrada de los textos */
+    function playEnter() {
+        hero.classList.remove('hero-anim');
+        if (reduceMotion) return;
+        void hero.offsetWidth;
+        hero.classList.add('hero-anim');
+    }
+
+    function goTo(i) {
+        if (total <= 1) return;
+        i = ((i % total) + total) % total;
+        if (i === index && started) { restartProgress(); scheduleNext(); return; }
+
+        index = i;
+        var b = banners[i];
+        updateChrome();
+        showImage(b.image_url);
+        preload((banners[(i + 1) % total] || {}).image_url);
+
+        window.clearTimeout(animTimer);
+
+        if (reduceMotion) {
+            renderCopy(b);
+            restartProgress();
+            scheduleNext();
+            return;
+        }
+
+        /* Salida suave del texto actual y, al terminar, entrada del nuevo */
+        hero.classList.remove('hero-anim');
+        hero.classList.add('hero-leaving');
+        animTimer = window.setTimeout(function () {
+            renderCopy(b);
+            hero.classList.remove('hero-leaving');
+            playEnter();
+        }, 260);
+
+        restartProgress();
+        scheduleNext();
+    }
+
+    function start() {
+        if (started) return;
+        started = true;
+        renderTitle(rawTitle);
+        showImage((banners[0] || {}).image_url, true);
+        preload((banners[1] || {}).image_url);
+        updateChrome();
+        playEnter();
+        restartProgress();
+        scheduleNext();
+    }
+
+    /* Puntos de navegacion */
+    if (dotsEl && total > 1) {
+        for (var d = 0; d < total; d++) {
+            var dot = document.createElement('button');
+            dot.type = 'button';
+            dot.className = 'hero-dot';
+            dot.setAttribute('role', 'tab');
+            dot.setAttribute('aria-label', 'Ir a la diapositiva ' + (d + 1));
+            dot.setAttribute('data-i', d);
+            dotsEl.appendChild(dot);
+        }
+        dotsEl.addEventListener('click', function (e) {
+            var t = e.target;
+            while (t && t !== dotsEl && !t.classList.contains('hero-dot')) t = t.parentNode;
+            if (t && t !== dotsEl) goTo(parseInt(t.getAttribute('data-i'), 10));
+        });
+    }
+
+    /* Las flechas usan onclick="heroSlide(...)" en el HTML */
+    window.heroSlide = function (dir) { goTo(index + (dir < 0 ? -1 : 1)); };
+
+    /* Pausa al pasar el mouse (solo dispositivos con hover) */
+    if (canHover) {
+        hero.addEventListener('mouseenter', pauseAuto);
+        hero.addEventListener('mouseleave', resumeAuto);
+    }
+
+    /* Swipe en tactil */
+    var tx = 0, ty = 0;
+    hero.addEventListener('touchstart', function (e) {
+        var t = e.changedTouches[0]; tx = t.clientX; ty = t.clientY;
+    }, { passive: true });
+    hero.addEventListener('touchend', function (e) {
+        var t = e.changedTouches[0];
+        var dx = t.clientX - tx;
+        var dy = t.clientY - ty;
+        if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+            goTo(index + (dx < 0 ? 1 : -1));
+        }
+    }, { passive: true });
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) { pauseAuto(); } else { resumeAuto(); }
+    });
+
+    /* Arranca cuando el overlay de carga termina, para que la entrada se vea */
+    function boot() { try { start(); } catch (e) {} }
+    if (document.getElementById('site-loader')) {
+        document.addEventListener('site:loaderhidden', boot, { once: true });
+        window.setTimeout(boot, 9000);
+    } else if (document.readyState === 'complete') {
+        window.setTimeout(boot, 0);
+    } else {
+        window.addEventListener('load', boot, { once: true });
+    }
+})();
 </script>
 <?php site_footer(); ?>
