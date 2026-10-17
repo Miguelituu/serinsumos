@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS local_products (
   title           VARCHAR(220)    NOT NULL,
   description     TEXT            NOT NULL DEFAULT '',
   price           DECIMAL(14,2)   NULL     COMMENT 'NULL = consultar precio',
+  stock           INT UNSIGNED    NULL     DEFAULT NULL COMMENT 'NULL = sin seguimiento de stock',
   currency_symbol VARCHAR(10)     NOT NULL DEFAULT '$',
   category        VARCHAR(120)    NOT NULL DEFAULT '',
   category_slug   VARCHAR(120)    NOT NULL DEFAULT '',
@@ -182,6 +183,5 @@ CREATE TABLE IF NOT EXISTS quotes (
   UNIQUE KEY uniq_quotes_token  (token),
   UNIQUE KEY uniq_quotes_number (number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 
 

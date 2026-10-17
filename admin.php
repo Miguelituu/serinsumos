@@ -225,12 +225,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $rows   = inv_read_upload((string)$file['tmp_name'], (string)$file['name']);
             $create = isset($_POST['crear_nuevos']) && $_POST['crear_nuevos'] === '1';
-            $report = inv_apply_import($rows, $create, (string)$file['name']);
-            inv_save_report($report);
+            $deleteMissing = isset($_POST['eliminar_ausentes']) && $_POST['eliminar_ausentes'] === '1';
+            inv_ensure_stock_column();
+            db()->beginTransaction();
+            try {
+                $report = inv_apply_import($rows, $create, (string)$file['name'], $deleteMissing);
+                inv_save_report($report);
+                db()->commit();
+            } catch (Throwable $e) {
+                if (db()->inTransaction()) db()->rollBack();
+                throw $e;
+            }
 
             $s = $report['stats'];
             $msg = 'Excel aplicado: ' . $s['updated'] . ' producto(s) actualizado(s), '
                  . $s['created'] . ' nuevo(s), ' . $s['unchanged'] . ' sin cambios';
+            if ($s['deleted'] > 0) $msg .= ', ' . $s['deleted'] . ' eliminado(s)';
             if ($s['ignored'] > 0) $msg .= ', ' . $s['ignored'] . ' omitido(s)';
             $msg .= '.';
             if ($report['notes']) $msg .= ' Revisá los avisos en "Qué cambió el último Excel".';
@@ -660,8 +670,20 @@ site_header('Administración', 'Panel de gestión de Serinsumos: clientes, pedid
     gap: 0;
     border-bottom: 2px solid var(--line);
     margin: 32px 0 28px;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--blue) var(--line);
+    scroll-snap-type: x proximity;
+    touch-action: pan-x;
 }
 .admin-tabs a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    scroll-snap-align: start;
     padding: 11px 22px;
     font-size: 14px;
     font-weight: 600;
@@ -670,6 +692,34 @@ site_header('Administración', 'Panel de gestión de Serinsumos: clientes, pedid
     margin-bottom: -2px;
     transition: color .15s, border-color .15s;
 }
+.admin-tabs::-webkit-scrollbar { height: 5px; }
+.admin-tabs::-webkit-scrollbar-track { background: var(--line); border-radius: 5px; }
+.admin-tabs::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 5px; }
+.admin-tabs-shell { position:relative; margin:32px 0 28px; }
+.admin-tabs-shell .admin-tabs { margin:0; }
+.admin-tabs-scroll {
+    display:none;
+    position:absolute;
+    z-index:3;
+    top:3px;
+    bottom:5px;
+    width:38px;
+    place-items:center;
+    border:1px solid var(--line);
+    border-radius:9px;
+    background:rgba(255,255,255,.96);
+    color:var(--ink);
+    font-size:22px;
+    line-height:1;
+    box-shadow:0 2px 8px rgba(23,37,48,.12);
+    cursor:pointer;
+}
+.admin-tabs-scroll:hover { background:#f1f8fc; color:var(--blue); }
+.admin-tabs-scroll.prev { left:4px; }
+.admin-tabs-scroll.next { right:4px; }
+.admin-tabs-shell.has-overflow .admin-tabs-scroll:not([hidden]) { display:grid; }
+.admin-tabs-shell.has-overflow.can-scroll-left .admin-tabs { scroll-padding-left:44px; }
+.admin-tabs-shell.has-overflow.can-scroll-right .admin-tabs { scroll-padding-right:44px; }
 .admin-tabs a:hover { color: var(--ink); }
 .admin-tabs a.active { color: var(--blue); border-bottom-color: var(--blue); }
 
@@ -1017,6 +1067,7 @@ input:checked ~ .confirm-revoke { display:inline; }
     </div>
 
     <!-- Pestañas -->
+    <div class="admin-tabs-shell">
     <nav class="admin-tabs" aria-label="Secciones del panel">
         <?php if (can('clientes')): ?>
         <a href="admin.php?tab=clientes" class="<?= $tab === 'clientes' ? 'active' : '' ?>">
@@ -1068,6 +1119,42 @@ input:checked ~ .confirm-revoke { display:inline; }
         </a>
         <?php endif; ?>
     </nav>
+    <button class="admin-tabs-scroll prev" type="button" aria-label="Desplazar secciones hacia la izquierda" title="Secciones anteriores" hidden>‹</button>
+    <button class="admin-tabs-scroll next" type="button" aria-label="Desplazar secciones hacia la derecha" title="Más secciones" hidden>›</button>
+    </div>
+    <script>
+    (() => {
+        const nav = document.querySelector('.admin-tabs');
+        const shell = document.querySelector('.admin-tabs-shell');
+        const active = nav?.querySelector('a.active');
+        const prev = shell?.querySelector('.admin-tabs-scroll.prev');
+        const next = shell?.querySelector('.admin-tabs-scroll.next');
+        if (!nav || !shell) return;
+        const updateScrollControls = () => {
+            const overflow = nav.scrollWidth > nav.clientWidth + 1;
+            const left = nav.scrollLeft > 1;
+            const right = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1;
+            shell.classList.toggle('has-overflow', overflow);
+            shell.classList.toggle('can-scroll-left', left);
+            shell.classList.toggle('can-scroll-right', right);
+            if (prev) prev.hidden = !overflow || !left;
+            if (next) next.hidden = !overflow || !right;
+        };
+        prev?.addEventListener('click', () => nav.scrollBy({left:-Math.max(180, nav.clientWidth * .72),behavior:'smooth'}));
+        next?.addEventListener('click', () => nav.scrollBy({left:Math.max(180, nav.clientWidth * .72),behavior:'smooth'}));
+        nav.addEventListener('scroll', updateScrollControls, {passive:true});
+        window.addEventListener('resize', updateScrollControls);
+        requestAnimationFrame(() => {
+            if (active) {
+                const start = active.offsetLeft;
+                const end = start + active.offsetWidth;
+                if (start < nav.scrollLeft) nav.scrollLeft = start;
+                else if (end > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = end - nav.clientWidth;
+            }
+            updateScrollControls();
+        });
+    })();
+    </script>
 
 
 
@@ -2502,6 +2589,7 @@ input:checked ~ .confirm-revoke { display:inline; }
         $repStats   = $invReport['stats'] ?? [];
         $repChanges = $invReport['changes'] ?? [];
         $repCreated = $invReport['created'] ?? [];
+        $repDeleted = $invReport['deleted'] ?? [];
         $repNotes   = $invReport['notes'] ?? [];
         ?>
 
@@ -2510,11 +2598,12 @@ input:checked ~ .confirm-revoke { display:inline; }
                 <h3>1️⃣ Descargar la planilla</h3>
                 <p>
                     Baja un Excel con <b>los <?= $invLocalCount ?> productos locales</b> del inventario y su estado actual
-                    (SKU, nombre, categoría, precio y si está visible).
+                    (SKU, nombre, categoría, precio, stock y visibilidad).
                 </p>
                 <a class="btn yellow" href="admin.php?tab=productos&amp;sec=excel&amp;descargar=excel">⬇️ Descargar Excel (.xlsx)</a>
                 <p style="margin:14px 0 0;font-size:12.5px">
-                    La planilla incluye una segunda hoja <code>Categorias</code> solo de referencia.
+                    La columna Stock queda vacía cuando el producto aún no tiene seguimiento; <b>0</b> significa sin unidades.
+                    Incluye una segunda hoja <code>Categorias</code> solo de referencia.
                     Los productos que vienen de la tienda de Hostinger no entran en la planilla.
                 </p>
             </div>
@@ -2522,10 +2611,10 @@ input:checked ~ .confirm-revoke { display:inline; }
             <div class="excel-card">
                 <h3>2️⃣ Editar y volver a subir</h3>
                 <p>
-                    Cambiá lo que necesites en la planilla (precios, nombres, categorías o visibilidad) y subila.
+                    Cambiá nombres, categorías, precios, stock o visibilidad. Las filas nuevas se pueden crear y los productos que falten se pueden eliminar.
                     <b>Solo se aplican los cambios detectados</b>: lo que quede igual no se toca.
                 </p>
-                <form method="post" enctype="multipart/form-data">
+                <form method="post" enctype="multipart/form-data" onsubmit="return confirmarImportExcel(this)">
                     <?= csrf_field() ?>
                     <input type="hidden" name="act"  value="import_inventory_excel">
                     <input type="hidden" name="_tab" value="productos">
@@ -2543,13 +2632,22 @@ input:checked ~ .confirm-revoke { display:inline; }
                             Si lo destildás, las filas nuevas se omiten y quedan avisadas en el reporte.
                         </span>
                     </div>
+                    <div class="prod-visibility-row" style="margin:14px 0;padding:12px;border:1px solid #f3c969;border-radius:9px;background:#fffbeb">
+                        <label style="font-weight:700">
+                            <input type="checkbox" name="eliminar_ausentes" value="1">
+                            Eliminar del inventario los productos locales que no aparezcan en el Excel
+                        </label>
+                        <span style="display:block;font-size:12px;color:#805b11;margin:5px 0 0 25px">
+                            Usalo solo con una planilla completa descargada desde aquí. Esta acción borra los productos ausentes y se registra en la actividad.
+                        </span>
+                    </div>
                     <button class="btn yellow" type="submit">⬆️ Aplicar cambios al inventario</button>
                 </form>
             </div>
         </div>
 
         <div class="excel-card" style="margin-top:18px">
-            <h3>3️⃣ Qué cambió el último Excel</h3>
+            <h3>3️⃣ Terminal de actividad · Excel</h3>
             <?php if (!$invReport): ?>
                 <p style="margin-bottom:0">Todavía no cargaste ninguna planilla desde el panel.</p>
             <?php else: ?>
@@ -2561,13 +2659,16 @@ input:checked ~ .confirm-revoke { display:inline; }
                 <p>
                     <span class="excel-badge up"><?= (int)($repStats['updated'] ?? 0) ?> actualizado(s)</span>
                     <span class="excel-badge new"><?= (int)($repStats['created'] ?? 0) ?> nuevo(s)</span>
+                    <?php if ((int)($repStats['deleted'] ?? 0) > 0): ?>
+                        <span class="excel-badge off"><?= (int)$repStats['deleted'] ?> eliminado(s)</span>
+                    <?php endif; ?>
                     <span class="excel-badge same"><?= (int)($repStats['unchanged'] ?? 0) ?> sin cambios</span>
                     <?php if ((int)($repStats['ignored'] ?? 0) > 0): ?>
                         <span class="excel-badge off"><?= (int)$repStats['ignored'] ?> omitido(s)</span>
                     <?php endif; ?>
                 </p>
                 <button class="btn outline" type="button" onclick="toggleUltimoExcel()" id="btn-ultimo-excel">
-                    🔍 Ver qué cambió el último Excel
+                    🔍 Ver actividad de la última carga
                 </button>
 
                 <div id="ultimo-excel" style="display:none;margin-top:20px">
@@ -2621,6 +2722,7 @@ input:checked ~ .confirm-revoke { display:inline; }
                                     <th>Nombre</th>
                                     <th>Categoría</th>
                                     <th>Precio</th>
+                                    <th>Stock</th>
                                     <th style="text-align:center">Visible</th>
                                 </tr>
                             </thead>
@@ -2632,7 +2734,26 @@ input:checked ~ .confirm-revoke { display:inline; }
                                     <td><b style="font-size:13px"><?= e((string)($nw['title'] ?? '')) ?></b></td>
                                     <td style="font-size:12.5px"><?= e((string)($nw['category'] ?? '')) ?: '<span style="color:var(--gray)">—</span>' ?></td>
                                     <td style="font-size:12.5px"><?= e((string)($nw['price'] ?? '')) ?></td>
+                                    <td style="text-align:center;font-size:12.5px"><?= e((string)($nw['stock'] ?? 'Sin seguimiento')) ?></td>
                                     <td style="text-align:center;font-size:12.5px"><?= e((string)($nw['visible'] ?? '')) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($repDeleted): ?>
+                        <h4 style="margin:22px 0 10px;font-size:14px">Productos eliminados</h4>
+                        <div style="overflow-x:auto">
+                        <table class="prod-table">
+                            <thead><tr><th>Producto</th><th>SKU</th><th>ID local</th></tr></thead>
+                            <tbody>
+                            <?php foreach ($repDeleted as $old): ?>
+                                <tr>
+                                    <td><b style="font-size:13px"><?= e((string)($old['title'] ?? '')) ?></b></td>
+                                    <td style="font-family:monospace;font-size:12px"><?= e((string)($old['sku'] ?? '')) ?></td>
+                                    <td style="font-size:12px;color:var(--gray)"><?= (int)($old['id'] ?? 0) ?></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -2665,7 +2786,11 @@ input:checked ~ .confirm-revoke { display:inline; }
             if (!box) return;
             const abierto = box.style.display !== 'none';
             box.style.display = abierto ? 'none' : 'block';
-            if (btn) btn.textContent = abierto ? '🔍 Ver qué cambió el último Excel' : '🙈 Ocultar el detalle';
+            if (btn) btn.textContent = abierto ? '🔍 Ver actividad de la última carga' : '🙈 Ocultar el detalle';
+        }
+        function confirmarImportExcel(form) {
+            const borrar = form.querySelector('[name="eliminar_ausentes"]');
+            return !borrar || !borrar.checked || confirm('La planilla se tomará como inventario completo. Se eliminarán permanentemente los productos locales que no aparezcan en ella. ¿Querés continuar?');
         }
         </script>
 

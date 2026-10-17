@@ -1544,6 +1544,7 @@ function normalize_local_product(array $row): array {
         $priceFmt = 'A consultar';
     }
 
+    $stock = isset($row['stock']) ? max(0, (int)$row['stock']) : null;
     $defaultVariant = [
         'id'                        => 'lcl-' . $id . '-default',
         'title'                     => 'Estándar',
@@ -1557,8 +1558,8 @@ function normalize_local_product(array $row): array {
         'price_formatted'           => $priceFmt,
         'sale_price_formatted'      => '',
         'effective_price_formatted' => $priceFmt,
-        'manage_inventory'          => false,
-        'inventory_quantity'        => null,
+        'manage_inventory'          => $stock !== null,
+        'inventory_quantity'        => $stock,
         'options'                   => [],
     ];
 
@@ -2432,4 +2433,3 @@ function save_instagram_posts(array $posts): void {
 require_installation();
 ensure_extended_schema();
 check_maintenance_mode();
-
