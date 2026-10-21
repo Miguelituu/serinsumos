@@ -371,394 +371,596 @@ function is_maintenance_mode(): bool {
 function render_maintenance_page(): void {
     $logo = site_logo();
     $favicon = site_favicon();
+    $siteName = setting('site_name', APP_NAME);
     $waUrl = whatsapp_url('Hola Serinsumos, me comunico de urgencia durante el mantenimiento del sitio web.');
+    $igHandle = instagram_handle();
+    $igDisplay = '@' . ltrim($igHandle, '@');
+    $igUrl = instagram_profile_url();
     ?>
 <!doctype html>
 <html lang="es-AR">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Sitio en Mantenimiento · Serinsumos</title>
+    <meta name="theme-color" content="#0b1622">
+    <meta name="robots" content="noindex">
+    <title>Sitio en mantenimiento · <?= e($siteName) ?></title>
     <link rel="icon" href="<?= e($favicon) ?>">
     <link rel="shortcut icon" href="<?= e($favicon) ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800&family=Hind:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #09111e;
-            --card-bg: rgba(23, 37, 48, 0.85);
-            --card-border: rgba(255, 255, 255, 0.12);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --yellow: #ffb703;
-            --yellow-hover: #e0a100;
+            --bg-deep: #070f18;
+            --panel: rgba(18, 34, 49, 0.97);
+            --text: #f6f9fc;
+            --muted: #a3b2c0;
+            --line: rgba(255, 255, 255, 0.11);
+            --blue: #39aef2;
+            --pink: #ed3285;
+            --yellow: #ffe72e;
+            --radius: clamp(20px, 3vw, 30px);
         }
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        *, *::before, *::after { box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; }
+        html.modal-open { overflow: hidden; }
         body {
-            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-            background: linear-gradient(135deg, #09111e 0%, #172530 50%, #0f172a 100%);
-            color: var(--text-main);
+            margin: 0;
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-            padding: 24px 16px;
-            position: relative;
-            overflow-x: hidden;
+            justify-content: center;
+            padding: clamp(14px, 4vw, 42px) clamp(12px, 4vw, 32px);
+            padding-top: max(clamp(14px, 4vw, 42px), env(safe-area-inset-top));
+            padding-bottom: max(clamp(14px, 4vw, 42px), env(safe-area-inset-bottom));
+            font-family: 'Hind', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(1100px 620px at 50% -12%, #1a3c56 0%, #0c1a27 52%, var(--bg-deep) 100%);
+            overflow-x: clip;
         }
-        body::before {
+        h1, h2, h3 { font-family: 'Rubik', system-ui, sans-serif; margin: 0; }
+        p { margin: 0; }
+        a { color: inherit; }
+        img { max-width: 100%; height: auto; }
+        .skip-link {
+            position: absolute;
+            left: 12px;
+            top: -80px;
+            z-index: 1200;
+            background: #fff;
+            color: #0b1622;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: top .18s ease;
+        }
+        .skip-link:focus { top: 12px; }
+
+        /* Fondo decorativo */
+        .maint-bg { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+        .maint-bg::before {
             content: '';
             position: absolute;
-            top: -150px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 550px;
-            height: 550px;
-            background: radial-gradient(circle, rgba(255, 183, 3, 0.14) 0%, rgba(255, 183, 3, 0) 70%);
-            pointer-events: none;
-            z-index: 0;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+            background-size: 64px 64px;
+            mask-image: radial-gradient(circle at 50% 35%, #000 0%, transparent 78%);
+            -webkit-mask-image: radial-gradient(circle at 50% 35%, #000 0%, transparent 78%);
         }
-        .maint-container {
-            max-width: 560px;
-            width: 100%;
-            background: var(--card-bg);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            border: 1px solid var(--card-border);
-            border-radius: 24px;
-            padding: 44px 34px;
-            text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
+        .maint-bg .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .55; }
+        .maint-bg .orb-1 { width: 380px; height: 380px; top: -140px; left: -110px; background: rgba(57, 174, 242, .28); }
+        .maint-bg .orb-2 { width: 340px; height: 340px; bottom: -150px; right: -100px; background: rgba(237, 50, 133, .22); }
+        .maint-bg .orb-3 { width: 260px; height: 260px; top: 42%; right: 6%; background: rgba(255, 231, 46, .10); }
+
+        .maint-wrap { position: relative; z-index: 1; width: 100%; max-width: 1020px; }
+
+        .maint-card {
             position: relative;
-            z-index: 1;
-            animation: fadeIn 0.5s ease-out;
+            width: 100%;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: linear-gradient(158deg, rgba(25, 44, 61, .97) 0%, rgba(14, 28, 41, .99) 58%, rgba(10, 21, 32, .99) 100%);
+            box-shadow: 0 34px 70px -30px rgba(0, 0, 0, .85), 0 0 0 1px rgba(255, 255, 255, .04) inset;
+            animation: maintIn .5s cubic-bezier(.22, .8, .3, 1) both;
         }
-        @keyframes fadeIn {
+        @keyframes maintIn {
             from { opacity: 0; transform: translateY(16px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        .maint-stripe {
+            height: 5px;
+            background: linear-gradient(90deg, var(--pink) 0 33.3%, var(--yellow) 33.3% 66.6%, var(--blue) 66.6% 100%);
+        }
+
+        /* Encabezado de marca */
+        .maint-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px 20px;
+            flex-wrap: wrap;
+            padding: clamp(18px, 3vw, 28px) clamp(20px, 4vw, 40px) 0;
         }
         .maint-logo-wrap {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: #ffffff;
-            padding: 14px 28px;
-            border-radius: 16px;
-            margin-bottom: 24px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+            background: #fff;
+            padding: clamp(8px, 1.4vw, 12px) clamp(14px, 2.4vw, 22px);
+            border-radius: 14px;
+            box-shadow: 0 10px 26px rgba(0, 0, 0, .32);
         }
-        .maint-logo {
-            max-height: 58px;
-            max-width: 230px;
-            object-fit: contain;
-            display: block;
-        }
+        .maint-logo { display: block; height: clamp(34px, 6.4vw, 48px); width: auto; max-width: min(230px, 46vw); object-fit: contain; }
         .maint-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(255, 183, 3, 0.15);
-            border: 1px solid rgba(255, 183, 3, 0.4);
-            color: var(--yellow);
-            padding: 6px 14px;
+            padding: 7px 14px;
             border-radius: 999px;
-            font-size: 13px;
+            border: 1px solid rgba(255, 231, 46, .38);
+            background: rgba(255, 231, 46, .10);
+            color: var(--yellow);
+            font-size: 11.5px;
             font-weight: 700;
-            letter-spacing: 0.5px;
-            margin-bottom: 18px;
+            letter-spacing: .9px;
             text-transform: uppercase;
+            line-height: 1.2;
         }
         .maint-badge-dot {
             width: 8px;
             height: 8px;
-            background: var(--yellow);
+            flex: 0 0 auto;
             border-radius: 50%;
-            animation: pulseDot 2s infinite;
+            background: var(--yellow);
+            box-shadow: 0 0 0 0 rgba(255, 231, 46, .55);
+            animation: pulseDot 2.2s ease-out infinite;
         }
         @keyframes pulseDot {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.35; transform: scale(0.85); }
+            0% { box-shadow: 0 0 0 0 rgba(255, 231, 46, .5); }
+            70% { box-shadow: 0 0 0 8px rgba(255, 231, 46, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 231, 46, 0); }
+        }
+
+        /* Cuerpo */
+        .maint-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+            gap: clamp(24px, 4vw, 52px);
+            align-items: start;
+            padding: clamp(24px, 4vw, 40px) clamp(20px, 4vw, 40px) clamp(26px, 4vw, 42px);
+        }
+        .maint-kicker {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 2.4px;
+            text-transform: uppercase;
+            color: var(--blue);
+            margin-bottom: 12px;
         }
         .maint-title {
-            font-size: 27px;
+            font-size: clamp(1.7rem, 4.2vw, 2.7rem);
+            line-height: 1.14;
+            letter-spacing: -.8px;
             font-weight: 800;
-            color: #ffffff;
-            line-height: 1.25;
-            margin-bottom: 12px;
-            letter-spacing: -0.4px;
+            color: #fff;
+            text-wrap: balance;
+            overflow-wrap: break-word;
         }
         .maint-desc {
-            font-size: 15px;
-            line-height: 1.6;
-            color: var(--text-muted);
-            margin-bottom: 30px;
+            margin-top: 16px;
+            font-size: clamp(14.5px, 1.6vw, 16px);
+            line-height: 1.65;
+            color: var(--muted);
+            max-width: 46ch;
         }
-        .btn-emergency {
+        .maint-desc strong { color: #e5eef6; font-weight: 600; }
+
+        .maint-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: clamp(22px, 3.4vw, 30px); }
+        .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
-            width: 100%;
-            padding: 16px 24px;
+            min-height: 52px;
+            padding: 14px 22px;
+            border-radius: 14px;
+            border: 1px solid transparent;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.2;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            flex: 1 1 210px;
+            transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+        }
+        .btn svg { width: 20px; height: 20px; flex: 0 0 auto; }
+        .btn-primary {
             background: var(--yellow);
             color: #0b1319;
-            font-family: inherit;
-            font-size: 16px;
-            font-weight: 700;
-            border: none;
-            border-radius: 14px;
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 10px 25px -5px rgba(255, 183, 3, 0.35);
+            box-shadow: 0 14px 30px -14px rgba(255, 231, 46, .7);
         }
-        .btn-emergency:hover {
-            background: var(--yellow-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 14px 28px -5px rgba(255, 183, 3, 0.45);
+        .btn-outline {
+            background: rgba(255, 255, 255, .04);
+            border-color: rgba(255, 255, 255, .22);
+            color: var(--text);
         }
-        .btn-emergency:active {
-            transform: translateY(0);
+        @media (hover: hover) {
+            .btn-primary:hover { background: #fff04f; transform: translateY(-2px); }
+            .btn-outline:hover { border-color: var(--blue); color: #fff; background: rgba(57, 174, 242, .12); }
+            .maint-facts a:hover { border-color: rgba(57, 174, 242, .45); background: rgba(57, 174, 242, .08); }
+            .admin-link:hover { color: var(--blue); }
+            .contact-action:hover { text-decoration: underline; }
         }
-        .admin-footer-link {
-            display: inline-block;
-            margin-top: 24px;
-            font-size: 12px;
-            color: rgba(148, 163, 184, 0.65);
-            text-decoration: none;
-            transition: color 0.2s;
-        }
-        .admin-footer-link:hover {
-            color: var(--text-main);
-            text-decoration: underline;
+        .btn:active { transform: scale(.99); }
+        .btn:focus-visible, .admin-link:focus-visible, .modal-close:focus-visible, .contact-action:focus-visible {
+            outline: 3px solid var(--blue);
+            outline-offset: 3px;
         }
 
-        /* Modal Contacto */
+        .maint-note {
+            margin-top: 16px;
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: #8496a6;
+        }
+
+        /* Panel de datos rápidos */
+        .maint-aside {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, .035);
+            padding: clamp(16px, 2.4vw, 22px);
+        }
+        .aside-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.8px;
+            text-transform: uppercase;
+            color: #8fa6b8;
+            margin-bottom: 6px;
+        }
+        .maint-facts { list-style: none; margin: 0; padding: 0; }
+        .maint-facts li { border-bottom: 1px solid var(--line); }
+        .maint-facts li:last-child { border-bottom: 0; }
+        .maint-facts a, .maint-facts .fact {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 13px 2px;
+            min-height: 56px;
+            text-decoration: none;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            transition: background .18s ease, border-color .18s ease;
+        }
+        .fact-ico {
+            width: 36px;
+            height: 36px;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            border-radius: 10px;
+            background: rgba(57, 174, 242, .12);
+            color: #8ed4ff;
+        }
+        .fact-ico svg { width: 18px; height: 18px; display: block; }
+        .fact-txt { min-width: 0; }
+        .fact-txt b { display: block; font-size: 13px; font-weight: 600; color: #dbe7f0; line-height: 1.3; }
+        .fact-txt span { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.4; overflow-wrap: anywhere; }
+        .fact-arrow { margin-left: auto; color: #6e8294; font-size: 16px; line-height: 1; flex: 0 0 auto; }
+
+        /* Pie */
+        .maint-foot {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px 18px;
+            flex-wrap: wrap;
+            padding: 12px clamp(20px, 4vw, 40px) 14px;
+            border-top: 1px solid var(--line);
+            background: rgba(6, 13, 21, .35);
+            font-size: 12px;
+            color: #8496a6;
+        }
+        .admin-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 44px;
+            padding: 8px 0;
+            color: #b9c8d5;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        /* Modal de contacto */
         .modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(3, 7, 18, 0.8);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            z-index: 1000;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
-            z-index: 9999;
+            background: rgba(3, 8, 14, .76);
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.22s ease, visibility 0.22s ease;
+            transition: opacity .22s ease, visibility .22s ease;
+            overflow-y: auto;
         }
-        .modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
         .modal-card {
-            background: #ffffff;
-            color: #0f172a;
             width: 100%;
-            max-width: 480px;
-            border-radius: 20px;
-            padding: 28px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
-            transform: scale(0.94) translateY(10px);
-            transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-            position: relative;
-        }
-        .modal-overlay.active .modal-card {
-            transform: scale(1) translateY(0);
-        }
-        .modal-header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            margin-bottom: 18px;
-        }
-        .modal-header h3 {
-            font-size: 20px;
-            font-weight: 800;
+            max-width: 460px;
+            max-height: calc(100vh - 40px);
+            max-height: calc(100dvh - 40px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            background: #fff;
             color: #0f172a;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            border-radius: 22px;
+            padding: clamp(20px, 4vw, 28px);
+            box-shadow: 0 30px 70px -20px rgba(0, 0, 0, .6);
+            transform: translateY(12px) scale(.97);
+            transition: transform .24s cubic-bezier(.34, 1.3, .64, 1);
         }
+        .modal-overlay.active .modal-card { transform: translateY(0) scale(1); }
+        .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+        .modal-header h2 { font-size: 20px; line-height: 1.25; font-weight: 800; color: #0f172a; }
+        .modal-header .modal-sub { margin-top: 4px; font-size: 13px; line-height: 1.45; color: #64748b; }
         .modal-close {
-            background: #f1f5f9;
-            border: none;
-            width: 34px;
-            height: 34px;
+            flex: 0 0 auto;
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            border: 0;
             border-radius: 50%;
-            font-size: 20px;
+            background: #f1f5f9;
+            color: #64748b;
+            font-size: 22px;
             line-height: 1;
             cursor: pointer;
-            color: #64748b;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
+            transition: background .18s ease, color .18s ease;
         }
-        .modal-close:hover {
-            background: #e2e8f0;
-            color: #0f172a;
-        }
-        .btn-whatsapp-direct {
+        .modal-close:hover { background: #e2e8f0; color: #0f172a; }
+        .btn-whatsapp {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
-            width: 100%;
+            min-height: 50px;
+            padding: 14px;
+            margin-bottom: 14px;
+            border-radius: 12px;
             background: #25d366;
-            color: #ffffff;
-            font-family: inherit;
+            color: #fff;
             font-size: 15px;
             font-weight: 700;
-            padding: 14px;
-            border-radius: 12px;
             text-decoration: none;
-            margin-bottom: 16px;
-            box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);
-            transition: background 0.2s, transform 0.2s;
+            box-shadow: 0 8px 20px -8px rgba(37, 211, 102, .7);
         }
-        .btn-whatsapp-direct:hover {
-            background: #20ba5a;
-            transform: translateY(-1px);
-        }
+        .btn-whatsapp:hover { background: #20ba5a; }
+        .contact-list { display: grid; gap: 10px; }
         .contact-item {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 14px 16px;
-            margin-bottom: 12px;
             display: flex;
             align-items: flex-start;
             gap: 12px;
+            padding: 13px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
             text-align: left;
         }
-        .contact-icon {
-            font-size: 22px;
-            line-height: 1;
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-        .contact-details h4 {
-            font-size: 14px;
-            font-weight: 700;
-            color: #0f172a;
-            margin-bottom: 3px;
-        }
-        .contact-details p {
-            font-size: 13px;
-            color: #475569;
-            line-height: 1.4;
-            margin-bottom: 4px;
-        }
+        .contact-icon { flex: 0 0 auto; width: 20px; height: 20px; margin-top: 2px; color: #0284c7; }
+        .contact-icon svg { width: 20px; height: 20px; display: block; }
+        .contact-details { min-width: 0; }
+        .contact-details h3 { font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 2px; }
+        .contact-details p { font-size: 13px; line-height: 1.45; color: #475569; overflow-wrap: anywhere; }
         .contact-action {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
+            margin-top: 4px;
             font-size: 12.5px;
             font-weight: 700;
             color: #0284c7;
             text-decoration: none;
         }
-        .contact-action:hover {
-            text-decoration: underline;
+
+        /* Tablets y móviles */
+        @media (max-width: 880px) {
+            .maint-grid { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+            .maint-aside { padding: 16px 18px; }
+            .maint-desc { max-width: none; }
+            .maint-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 10px; }
+            .maint-facts li { border-bottom: 0; }
+            .maint-facts a, .maint-facts .fact { align-items: flex-start; padding: 10px 8px; height: 100%; }
+            .fact-arrow { display: none; }
         }
-        @media (max-width: 480px) {
-            .maint-container {
-                padding: 30px 18px;
-                border-radius: 20px;
-            }
-            .maint-title {
-                font-size: 23px;
-            }
+        @media (max-width: 640px) {
+            body { justify-content: flex-start; }
+            .maint-wrap { max-width: 520px; }
+            .maint-head { gap: 12px; }
+            .maint-badge { font-size: 10.5px; padding: 6px 11px; }
+            .maint-cta { flex-direction: column; }
+            .btn { width: 100%; flex: 1 1 auto; }
+            .maint-aside { display: none; }
+            .maint-facts { grid-template-columns: 1fr; }
+            .maint-facts li { border-bottom: 1px solid var(--line); }
+            .maint-facts li:last-child { border-bottom: 0; }
+            .maint-facts a, .maint-facts .fact { align-items: center; padding: 11px 2px; }
+            .maint-foot { font-size: 11.5px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+            .modal-overlay { align-items: flex-end; padding: 0; }
             .modal-card {
-                padding: 22px 16px;
+                max-width: none;
+                max-height: 92vh;
+                max-height: 92dvh;
+                border-radius: 22px 22px 0 0;
+                padding-bottom: max(22px, env(safe-area-inset-bottom));
+                transform: translateY(24px);
+            }
+        }
+        @media (max-width: 380px) {
+            .maint-badge { font-size: 10px; letter-spacing: .6px; }
+            .maint-logo { max-width: 54vw; }
+        }
+        @media (max-height: 560px) and (min-width: 641px) {
+            body { justify-content: flex-start; padding-top: 12px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: .001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .001ms !important;
             }
         }
     </style>
 </head>
 <body>
+<a class="skip-link" href="#maint-main">Saltar al contenido</a>
 
-<div class="maint-container">
-    <div class="maint-logo-wrap">
-        <img src="<?= e($logo) ?>" alt="Serinsumos" class="maint-logo">
-    </div>
-
-    <div class="maint-badge">
-        <span class="maint-badge-dot"></span>
-        Modo Mantenimiento
-    </div>
-
-    <h1 class="maint-title">Estamos actualizando nuestro sitio</h1>
-    <p class="maint-desc">
-        Estamos realizando tareas técnicas y mejoras para brindarte una mejor experiencia en insumos y maquinarias para sublimación. Volvemos muy pronto.
-    </p>
-
-    <button type="button" class="btn-emergency" onclick="toggleModal(true)">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-        </svg>
-        Contacto de Emergencia
-    </button>
-
-    <div>
-        <a href="<?= e(site_url('cuenta.php?admin=1')) ?>" class="admin-footer-link">
-            ¿Sos administrador? Iniciar sesión
-        </a>
-    </div>
+<div class="maint-bg" aria-hidden="true">
+    <span class="orb orb-1"></span>
+    <span class="orb orb-2"></span>
+    <span class="orb orb-3"></span>
 </div>
 
-<!-- Modal Contacto de Emergencia -->
-<div class="modal-overlay" id="emergencyModal" onclick="handleBackdropClick(event)">
-    <div class="modal-card">
+<main class="maint-wrap" id="maint-main">
+    <section class="maint-card" aria-labelledby="maint-title">
+        <div class="maint-stripe" aria-hidden="true"></div>
+
+        <header class="maint-head">
+            <div class="maint-logo-wrap">
+                <img src="<?= e($logo) ?>" alt="<?= e($siteName) ?>" class="maint-logo">
+            </div>
+            <span class="maint-badge">
+                <span class="maint-badge-dot" aria-hidden="true"></span>
+                Sitio en mantenimiento
+            </span>
+        </header>
+
+        <div class="maint-grid">
+            <div class="maint-copy">
+                <p class="maint-kicker">Insumos y maquinarias para sublimación</p>
+                <h1 class="maint-title" id="maint-title">Estamos actualizando nuestro sitio</h1>
+                <p class="maint-desc">
+                    Estamos realizando tareas técnicas y mejoras para brindarte una mejor experiencia.
+                    <strong>Volvemos muy pronto.</strong>
+                </p>
+
+                <div class="maint-cta">
+                    <a class="btn btn-primary" href="<?= e($waUrl) ?>" target="_blank" rel="noopener noreferrer">
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 11.05 0a11.82 11.82 0 0 1 8.413 3.488 11.82 11.82 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                        Escribinos por WhatsApp
+                    </a>
+                    <button type="button" class="btn btn-outline" onclick="toggleModal(true)" aria-haspopup="dialog" aria-controls="emergencyModal">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        Datos de contacto
+                    </button>
+                </div>
+
+                <p class="maint-note">Atención de urgencias: lunes a viernes, de 9 a 18 hs.</p>
+            </div>
+
+            <aside class="maint-aside" aria-label="Información de contacto">
+                <h2 class="aside-title">Mientras volvemos</h2>
+                <ul class="maint-facts">
+                    <li>
+                        <div class="fact">
+                            <span class="fact-ico" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                            </span>
+                            <span class="fact-txt"><b>Horarios</b><span>Lun a Vie · 9 a 18 hs</span></span>
+                        </div>
+                    </li>
+                    <li>
+                        <a href="https://www.google.com/maps/search/?api=1&query=Ram%C3%B3n+Ocampo+1309+San+Vicente+C%C3%B3rdoba+Argentina+5006" target="_blank" rel="noopener noreferrer">
+                            <span class="fact-ico" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="2.6"/></svg>
+                            </span>
+                            <span class="fact-txt"><b>Taller y depósito</b><span>Ramón Ocampo 1309, Córdoba</span></span>
+                            <span class="fact-arrow" aria-hidden="true">↗</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="<?= e($igUrl) ?>" target="_blank" rel="noopener noreferrer">
+                            <span class="fact-ico" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
+                            </span>
+                            <span class="fact-txt"><b>Instagram</b><span><?= e($igDisplay) ?></span></span>
+                            <span class="fact-arrow" aria-hidden="true">↗</span>
+                        </a>
+                    </li>
+                </ul>
+            </aside>
+        </div>
+
+        <footer class="maint-foot">
+            <span>© <?= date('Y') ?> <?= e($siteName) ?></span>
+            <a class="admin-link" href="<?= e(site_url('cuenta.php?admin=1')) ?>">
+                Acceso administrador
+                <span aria-hidden="true">→</span>
+            </a>
+        </footer>
+    </section>
+</main>
+
+<div class="modal-overlay" id="emergencyModal" role="dialog" aria-modal="true" aria-labelledby="emergencyTitle" aria-hidden="true" onclick="handleBackdropClick(event)">
+    <div class="modal-card" role="document">
         <div class="modal-header">
             <div>
-                <h3>🚨 Contacto de Emergencia</h3>
-                <p style="font-size:13px;color:#64748b;margin-top:2px">Comunicate directamente con nuestro equipo ante cualquier consulta o urgencia:</p>
+                <h2 id="emergencyTitle">Contacto de emergencia</h2>
+                <p class="modal-sub">Comunicate directamente con nuestro equipo ante cualquier consulta o urgencia.</p>
             </div>
             <button type="button" class="modal-close" onclick="toggleModal(false)" aria-label="Cerrar">&times;</button>
         </div>
 
-        <a href="<?= e($waUrl) ?>" target="_blank" rel="noopener noreferrer" class="btn-whatsapp-direct">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
-            </svg>
-            Chatear por WhatsApp Urgencias
+        <a href="<?= e($waUrl) ?>" target="_blank" rel="noopener noreferrer" class="btn-whatsapp">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 11.05 0a11.82 11.82 0 0 1 8.413 3.488 11.82 11.82 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+            Chatear por WhatsApp
         </a>
 
-        <div>
+        <div class="contact-list">
             <div class="contact-item">
-                <span class="contact-icon">📍</span>
+                <span class="contact-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="2.6"/></svg>
+                </span>
                 <div class="contact-details">
-                    <h4>Dirección del taller y depósito</h4>
+                    <h3>Taller y depósito</h3>
                     <p>Ramón Ocampo 1309, B° San Vicente, Córdoba, Argentina (CP 5006)</p>
-                    <a href="https://www.google.com/maps/search/?api=1&query=Ram%C3%B3n+Ocampo+1309+San+Vicente+C%C3%B3rdoba+Argentina+5006" target="_blank" rel="noopener noreferrer" class="contact-action">
-                        Abrir en Google Maps &rarr;
-                    </a>
+                    <a href="https://www.google.com/maps/search/?api=1&query=Ram%C3%B3n+Ocampo+1309+San+Vicente+C%C3%B3rdoba+Argentina+5006" target="_blank" rel="noopener noreferrer" class="contact-action">Abrir en Google Maps →</a>
                 </div>
             </div>
 
             <div class="contact-item">
-                <span class="contact-icon">📸</span>
+                <span class="contact-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
+                </span>
                 <div class="contact-details">
-                    <h4>Instagram</h4>
+                    <h3>Instagram</h3>
                     <p>Avisos, novedades y canales de contacto directo.</p>
-                    <a href="https://www.instagram.com/ser.insumos/" target="_blank" rel="noopener noreferrer" class="contact-action">
-                        @ser.insumos &rarr;
-                    </a>
+                    <a href="<?= e($igUrl) ?>" target="_blank" rel="noopener noreferrer" class="contact-action"><?= e($igDisplay) ?> →</a>
                 </div>
             </div>
 
-            <div class="contact-item" style="margin-bottom:0">
-                <span class="contact-icon">⏰</span>
+            <div class="contact-item">
+                <span class="contact-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                </span>
                 <div class="contact-details">
-                    <h4>Horarios de atención</h4>
+                    <h3>Horarios de atención</h3>
                     <p>Lunes a Viernes de 9:00 a 18:00 hs.</p>
                 </div>
             </div>
@@ -767,24 +969,56 @@ function render_maintenance_page(): void {
 </div>
 
 <script>
+var maintLastFocus = null;
+
 function toggleModal(show) {
-    var m = document.getElementById('emergencyModal');
-    if (!m) return;
+    var modal = document.getElementById('emergencyModal');
+    if (!modal) return;
+    var isOpen = modal.classList.contains('active');
+    if (show === isOpen) return;
+
     if (show) {
-        m.classList.add('active');
-        document.body.style.overflow = 'hidden';
+        maintLastFocus = document.activeElement;
+        modal.classList.add('active');
+        modal.setAttribute('aria-hidden', 'false');
+        document.documentElement.classList.add('modal-open');
+        var closeBtn = modal.querySelector('.modal-close');
+        if (closeBtn) closeBtn.focus();
     } else {
-        m.classList.remove('active');
-        document.body.style.overflow = '';
+        modal.classList.remove('active');
+        modal.setAttribute('aria-hidden', 'true');
+        document.documentElement.classList.remove('modal-open');
+        if (maintLastFocus && typeof maintLastFocus.focus === 'function') maintLastFocus.focus();
+        maintLastFocus = null;
     }
 }
-function handleBackdropClick(e) {
-    if (e.target === document.getElementById('emergencyModal')) {
+
+function handleBackdropClick(event) {
+    if (event.target === document.getElementById('emergencyModal')) toggleModal(false);
+}
+
+document.addEventListener('keydown', function (event) {
+    var modal = document.getElementById('emergencyModal');
+    if (!modal || !modal.classList.contains('active')) return;
+
+    if (event.key === 'Escape') {
         toggleModal(false);
+        return;
     }
-}
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') toggleModal(false);
+    if (event.key !== 'Tab') return;
+
+    var focusables = modal.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    if (!focusables.length) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
 });
 </script>
 
